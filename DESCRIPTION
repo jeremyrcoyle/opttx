@@ -1,0 +1,13 @@
+Package: opttx
+Title: opttx - Optimal Treatment Estimation
+Version: 0.0.0.9000
+Author: Jeremy Coyle <jeremyrcoyle@gmail.com>
+Maintainer: Jeremy Coyle <jeremyrcoyle@gmail.com>
+Description: opttx estimates optimal treatment rules and the mean outcome under such rules
+License: GPL-3
+Depends:
+    R (>= 3.0.0),
+    SuperLearner,
+    origami,
+    plyr,
+    ggplot2
