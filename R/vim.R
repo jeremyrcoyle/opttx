@@ -14,10 +14,14 @@ SL_vim <- function(osl_fit, data, Xnodes, ...) {
     risk_fun <- risk_from_osl(osl_fit)
     Y <- osl_fit$valY
     full_risk <- risk_fun(full_preds, Y)
+    # maybe predict full_pred instead?
     riskdf <- ldply(seq_along(Xnodes), .progress = "text", function(idx, ...) {
         new_Xnodes <- Xnodes[-1 * idx]
-        new_fit <- origami_SuperLearner(Y = Y, X = data[, new_Xnodes], folds = osl_fit$folds, family = osl_fit$fullFit$family, 
+        new_fit <- origami_SuperLearner(Y = as.vector(full_preds), X = data[, new_Xnodes], folds = osl_fit$folds, family = gaussian(), 
             SL.library = osl_fit$SL.library, ...)
+        # new_fit <- origami_SuperLearner(Y = Y, X = data[, new_Xnodes], folds = osl_fit$folds, family =
+        # osl_fit$fullFit$family, SL.library = osl_fit$SL.library, ...)
+        
         new_preds <- cv_predict_original(new_fit)
         risk_from_Y <- risk_fun(new_preds, Y)
         risk_from_full <- risk_fun(new_preds, full_preds)

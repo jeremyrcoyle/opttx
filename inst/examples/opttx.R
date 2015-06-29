@@ -53,4 +53,3 @@ ggplot(vim, aes(y = node, x = risk_full_fraction, color = model)) + geom_point()
 library(reshape2)
 long <- melt(vim, id = c("node", "model"))
 ggplot(long, aes(y = node, x = value, color = model)) + geom_point() + facet_wrap(~variable, scales = "free") + theme_bw() 
-
