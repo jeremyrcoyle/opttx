@@ -2,7 +2,7 @@
 #' @title opt_tmle
 #' @description Estimation of the Optimal Treatment rule using Super Learner and mean performance using CV-TMLE
 #' To avoid nesting cross-validation, it uses split-specfic estimates of Q and g to estimate the rule, and 
-#' "split-specific" estimates of the rule in CV-TMLE to estimate mean performance
+#' 'split-specific' estimates of the rule in CV-TMLE to estimate mean performance
 #' @param data data.frame containing the relevant variable
 #' @param Wnodes, vector of column names indicating covariates
 #' @param Anode, column name of treatment
@@ -19,64 +19,53 @@
 #' @example /inst/examples/opttx.R
 #' 
 #' @export
-opt_tmle <- function(data,
-                  Wnodes=grep("^W", names(data), value = T),Anode="A",Ynode="Y", Vnodes=Wnodes,
-                  stratifyAY=TRUE,
-                  Q_library=c("SL.glm", "SL.glmem", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", 
-                              "SL.mean"),
-                  g_library=c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"),
-                  blip_library=c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", 
-                                 "SL.rpart", "SL.rpartPrune", "SL.mean"),
-                  maximize=T,
-                  verbose=1,
-                  parallel=F){
-  if(stratifyAY){
-    AYstrata <- sprintf("%s %s", data[,Anode], data[,Ynode])
-    folds <- make_folds(strata_ids = AYstrata, V = 10)
-  } else {
-    folds <- make_folds(V = 10)
-  }
-  
-  #possibly we should make these lists the arguments directly (ltmle does this for SL.library, but not for nodes)
-  nodes <- list(Wnodes=Wnodes, Anode=Anode, Ynode=Ynode, Vnodes=Vnodes)
-  SL.library <-list(Q_library=Q_library, g_library=g_library, blip_library= blip_library)
-  
-  
-  #fit Q and g
-  message_verbose("Fitting Q",1,verbose)
-  Q_fit <- origami_SuperLearner(folds = folds, data[,Ynode], data[, c(Anode, Wnodes)], family = binomial(), SL.library = SL.library$Q_library, 
-                                cts.num = 5, .parallel=parallel)
-  
-  message_verbose("Fitting g",1,verbose)
-  g_fit <- origami_SuperLearner(folds = folds, data[,Anode], data[, Wnodes], family = binomial(), SL.library = SL.library$g_library, 
-                                cts.num = 5, .parallel=parallel)
-  fits <- list(Q_fit=Q_fit, g_fit=g_fit)
-  
-  #get split-specific predictions, as well as class and weight for rule learning
-  message_verbose("Getting split-specific predictions",2,verbose)
-  split_preds <- cross_validate(cv_split_preds, folds, data, nodes, fits, maximize=maximize, .combine = F, .parallel=parallel)
-  
-  
-  
-  #fit rule
-  message_verbose("Fitting rule",1,verbose)
-  fits$blip_fit <- learn_rule(data, folds, nodes, split_preds, SL.library$blip_library, maximize=maximize, parallel=parallel)
-  
-  #estimate performance
-  message_verbose("Estimating performance",1,verbose)
-  ests <-  all_ests(data, folds, nodes, fits, split_preds,parallel=parallel)
-  
-  result <- list(data=data,
-                 fits=fits,
-                 ests=ests,
-                 nodes=nodes,
-                 SL.library=SL.library,
-                 folds=folds,
-                 split_preds=split_preds)
-  result$optA = assign_treatment(result,data)
-  class(result) <- "opt_tmle"
-  
-  return(result)
+opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = T), Anode = "A", Ynode = "Y", Vnodes = Wnodes, stratifyAY = TRUE, 
+    Q_library = c("SL.glm", "SL.glmem", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), 
+    g_library = c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), blip_library = c("SL.glm", 
+        "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), maximize = T, verbose = 1, 
+    parallel = F) {
+    if (stratifyAY) {
+        AYstrata <- sprintf("%s %s", data[, Anode], data[, Ynode])
+        folds <- make_folds(strata_ids = AYstrata, V = 10)
+    } else {
+        folds <- make_folds(V = 10)
+    }
+    
+    # possibly we should make these lists the arguments directly (ltmle does this for SL.library, but not for nodes)
+    nodes <- list(Wnodes = Wnodes, Anode = Anode, Ynode = Ynode, Vnodes = Vnodes)
+    SL.library <- list(Q_library = Q_library, g_library = g_library, blip_library = blip_library)
+    
+    
+    # fit Q and g
+    message_verbose("Fitting Q", 1, verbose)
+    Q_fit <- origami_SuperLearner(folds = folds, data[, Ynode], data[, c(Anode, Wnodes)], family = binomial(), SL.library = SL.library$Q_library, 
+        cts.num = 5, .parallel = parallel)
+    
+    message_verbose("Fitting g", 1, verbose)
+    g_fit <- origami_SuperLearner(folds = folds, data[, Anode], data[, Wnodes], family = binomial(), SL.library = SL.library$g_library, 
+        cts.num = 5, .parallel = parallel)
+    fits <- list(Q_fit = Q_fit, g_fit = g_fit)
+    
+    # get split-specific predictions, as well as class and weight for rule learning
+    message_verbose("Getting split-specific predictions", 2, verbose)
+    split_preds <- cross_validate(cv_split_preds, folds, data, nodes, fits, maximize = maximize, .combine = F, .parallel = parallel)
+    
+    
+    
+    # fit rule
+    message_verbose("Fitting rule", 1, verbose)
+    fits$blip_fit <- learn_rule(data, folds, nodes, split_preds, SL.library$blip_library, maximize = maximize, parallel = parallel)
+    
+    # estimate performance
+    message_verbose("Estimating performance", 1, verbose)
+    ests <- all_ests(data, folds, nodes, fits, split_preds, parallel = parallel)
+    
+    result <- list(data = data, fits = fits, ests = ests, nodes = nodes, SL.library = SL.library, folds = folds, split_preds = split_preds, 
+        maximize = maximize)
+    result$optA <- assign_treatment(result, data)
+    class(result) <- "opt_tmle"
+    
+    return(result)
 }
 
 #' @title assign_treatment
@@ -87,34 +76,34 @@ opt_tmle <- function(data,
 #' 
 #' @export
 assign_treatment <- function(obj, newdata) {
-  pblip <- predict(obj$fits$blip_fit, newdata = newdata[, obj$nodes$Vnodes, drop = F])$pred
-  as.numeric(pblip > 0.5)
+    pblip <- predict(obj$fits$blip_fit, newdata = newdata[, obj$nodes$Vnodes, drop = F])$pred
+    as.numeric(pblip > 0.5)
 }
 
 
 #' @rdname opt_tmle
 #' @export
-print.opt_tmle=function(obj){
-  A=obj$data[,obj$nodes$Anode]
-  optA=obj$optA
-  n=length(A)
-  tab=table(`observed tx`=A,`optimal tx`=optA)/n
-  tab=addmargins(tab)
-  cat("Treatment Assignments\n\n")
-  
-  print(tab)
-  cat("\n\n")
-  ests=obj$ests
-  names(ests)=c("Estimate","SD","CI Lower Bound","CI Upper Bound")
-  cat("CV-TMLE Estimates\n\n")
-  print(ests)
+print.opt_tmle <- function(obj) {
+    A <- obj$data[, obj$nodes$Anode]
+    optA <- obj$optA
+    n <- length(A)
+    tab <- table(`observed tx` = A, `optimal tx` = optA)/n
+    tab <- addmargins(tab)
+    cat("Treatment Assignments\n\n")
+    
+    print(tab)
+    cat("\n\n")
+    ests <- obj$ests
+    names(ests) <- c("Estimate", "SD", "CI Lower Bound", "CI Upper Bound")
+    cat("CV-TMLE Estimates\n\n")
+    print(ests)
 }
 
 
 #' @rdname opt_tmle
 #' @export
-plot.opt_tmle=function(obj){
-  ggplot(obj$ests,aes(y=rule,x=est,xmin=lower,xmax=upper))+geom_point()+geom_errorbarh()+theme_bw()+ylab("Rule")+
-    xlab(expression(E~bgroup("[",Y[A],"]")))
+plot.opt_tmle <- function(obj) {
+    ggplot(obj$ests, aes(y = rule, x = est, xmin = lower, xmax = upper)) + geom_point() + geom_errorbarh() + theme_bw() + 
+        ylab("Rule") + xlab(expression(E ~ bgroup("[", Y[A], "]")))
 }
-
+ 

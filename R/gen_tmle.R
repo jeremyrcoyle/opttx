@@ -11,7 +11,7 @@ fluctuate <- function(tmledata, flucmod, subset = seq_len(nrow(tmledata))) {
 }
 
 # iteratively perform tmle until convergence
-gentmle <- function(initdata, estimate_fun, update_fun,max_iter=100) {
+gentmle <- function(initdata, estimate_fun, update_fun, max_iter = 100) {
     converge <- F
     
     # cat(sprintf('bw: %f\n',bw))
@@ -208,5 +208,5 @@ eysigma_estimate <- function(tmledata) {
 
 # example code to construct initial tmle data A=data$a Y=data$y W=data$w g1=estg(W,A)#g(data$wstar)
 # Q1=ksmooth(knnfit,bw) order=1/length(Y) Qk=Q1 gk=g1 psi=mean(Qk) var1=mean(Qk*(1-Qk)/gk+(Qk-psi)^2)
-# tmledata=data.frame(Qk,gk,A,Y) 
- TRUE
+# tmledata=data.frame(Qk,gk,A,Y)
+TRUE 
