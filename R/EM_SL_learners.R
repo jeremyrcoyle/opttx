@@ -33,5 +33,4 @@ predict.SL.glmnetem <- function(object, newdata, ...) {
     pred <- predict(object$object$glmnet.fit, newx = newdata, s = ifelse(object$useMin, object$object$lambda.min, object$object$lambda.1se), 
         type = "response")
     return(pred)
-}
- 
+} 

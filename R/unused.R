@@ -74,7 +74,4 @@ nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V,
     # should probably be more careful with obsWeights here fit split-specific blip based on split-specific Q and g
     cv_SL(fold, Z, X[, V, drop = F], SL.library, family, obsWeights * K, id, ...)
     # cv_SL(fold, D1, X[,V,drop=F], SL.library, family, obsWeights, id, ...)
-}
-
-
- 
+} 

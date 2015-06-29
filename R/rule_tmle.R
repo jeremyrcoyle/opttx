@@ -51,14 +51,19 @@ extract_val <- function(fold, split_preds) {
     return(result)
 }
 
-all_ests <- function(data, folds, nodes, fits, split_preds, parallel = F) {
-    # extract split-specific validation predictions
+# extract split-specific validation predictions
+extract_vals <- function(folds, split_preds, parallel = F) {
+    
     val_preds <- cross_validate(extract_val, folds, split_preds, .parallel = parallel)$preds
     val_preds <- val_preds[order(val_preds$index), ]
+}
+
+all_ests <- function(data, folds, nodes, fits, split_preds, blip_type, parallel = F) {
+    val_preds <- extract_vals(folds, split_preds, parallel)
     
     # fit static blip blipfit0=subopt(c('W2'),split_preds,folds,data,SL.library='SL.mean')
     cv_pblip <- cv_predict_original(fits$blip_fit)
-    cv_optA <- as.numeric(cv_pblip > 0.5)
+    cv_optA <- treatment_from_pred(cv_pblip, blip_type)
     A <- data[, nodes$Anode]
     Y <- data[, nodes$Ynode]
     ests <- with(val_preds, {
@@ -74,7 +79,4 @@ all_ests <- function(data, folds, nodes, fits, split_preds, parallel = F) {
     
     # diffest <- tworuletmle2(data$A, data$Y, cv_pA1, cv_Q0W, cv_Q1W, old_optA, cv_optA)
     return(ests)
-}
-
-
- 
+} 

@@ -42,19 +42,23 @@ cv_split_preds <- function(fold, data, nodes, fits, use_full = F, maximize = T) 
 # ignores Y and instead uses Z generated from a split-specific training set generated using cv_split_preds X are the
 # nodes to base the rule on
 #' @export
-split_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, use_full = F, split_preds, ...) {
+split_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, use_full = F, split_preds, blip_type = blip_type, 
+    maximize = maximize, ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()
     
+    if (blip_type == "cl.surlog") {
+        obsWeights <- obsWeights * split_preds$K[[v]]
+        Y <- split_preds$Z[[v]]
+    } else if (blip_type == "QbV.mse") {
+        Y <- ifelse(maximize, 1, -1) * split_preds$D1[[v]]
+    }
     # should probably be more careful with obsWeights here fit split-specific blip based on split-specific Q and g
-    cv_SL(fold, split_preds$Z[[v]], X, SL.library, family, obsWeights * split_preds$K[[v]], id, ...)
+    cv_SL(fold, Y, X, SL.library, family, obsWeights, id, ...)
 }
 
 
-surlog <- function(wgts, Y, preds) {
-    mean(wgts * (-plogis((2 * Y - 1) * (preds), log.p = TRUE)))
-}
 
 
 # alex's log loss for weighted classification based opt tx approach
@@ -62,13 +66,22 @@ surlog <- function(wgts, Y, preds) {
 #'
 method.surlog <- function() {
     out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, obsWeights, ...) {
-        cvRisk <- apply(Z, 2, function(x) {
-            -mean(obsWeights * ifelse(Y, log(x), log(1 - x)))
-        })
-        names(cvRisk) <- libraryNames
+        surlog <- function(wgts, Y, preds) {
+            mean(wgts * (-plogis((2 * Y - 1) * (preds), log.p = TRUE)))
+        }
+        
+        
+        # cvRisk <- apply(Z, 2, function(x) { -mean(obsWeights * ifelse(Y, log(x), log(1 - x))) })
         
         preds <- Z - 1/2
         wgts <- obsWeights
+        
+        cvRisk <- apply(preds, 2, function(x) {
+            surlog(wgts, Y, x)
+        })
+        
+        names(cvRisk) <- libraryNames
+        
         risk.fun <- function(b) {
             surlog(wgts, Y, c(preds %*% cbind(b)))
         }
@@ -87,5 +100,4 @@ method.surlog <- function() {
         return(out)
     })
     invisible(out)
-}
- 
+} 
