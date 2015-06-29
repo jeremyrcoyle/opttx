@@ -60,7 +60,7 @@ opt_tmle <- function(data,
   
   #fit rule
   message_verbose("Fitting rule",1,verbose)
-  fits$blip_fit <- learn_rule(data, folds, nodes, split_preds, SL.library, maximize=maximize, parallel=parallel)
+  fits$blip_fit <- learn_rule(data, folds, nodes, split_preds, SL.library$blip_library, maximize=maximize, parallel=parallel)
   
   #estimate performance
   message_verbose("Estimating performance",1,verbose)
