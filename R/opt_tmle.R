@@ -60,7 +60,7 @@ opt_tmle <- function(data,
   
   #fit rule
   message_verbose("Fitting rule",1,verbose)
-  fits$blip_fit <- learn_rule(data, folds, nodes, split_preds, SL.library$blip_library, maximize=maximize, parallel=parallel)
+  fits$blip_fit <- learn_rule(data, folds, nodes, split_preds, SL.library, maximize=maximize, parallel=parallel)
   
   #estimate performance
   message_verbose("Estimating performance",1,verbose)
@@ -101,8 +101,10 @@ print.opt_tmle=function(obj){
   tab=table(`observed tx`=A,`optimal tx`=optA)/n
   tab=addmargins(tab)
   cat("Treatment Assignments\n\n")
+  
   print(tab)
   cat("\n\n")
+  ests=obj$ests
   names(ests)=c("Estimate","SD","CI Lower Bound","CI Upper Bound")
   cat("CV-TMLE Estimates\n\n")
   print(ests)

@@ -43,6 +43,7 @@ cv_split_preds <- function(fold, data, nodes, fits, use_full = F, maximize = T) 
 #and instead uses Z generated from a split-specific training set
 # generated using cv_split_preds
 # X are the nodes to base the rule on
+#' @export
 split_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, use_full = F, split_preds, ...) {
   v <- fold_index()
   train_idx <- training()
@@ -55,6 +56,7 @@ split_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, use_full
 
 
 # alex's log loss for weighted classification based opt tx approach
+#' @export
 method.surlog <- function() {
   out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, obsWeights, ...) {
     cvRisk <- apply(Z, 2, function(x) {

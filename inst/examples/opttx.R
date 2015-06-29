@@ -1,3 +1,4 @@
+library(opttx)
 Qbar0 <- function(A, W) {
   W1 <- W[, 1]
   W2 <- W[, 2]

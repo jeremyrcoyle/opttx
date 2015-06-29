@@ -1,7 +1,7 @@
 
 # fit on subset of covariates V
 learn_rule <- function(data, folds, nodes, split_preds, 
-                       SL.library = c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"),
+                       SL.library=list(blip_library=c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean")),
                        maximize=T, parallel=F) {
   
   if (length(nodes$Vnodes) == 1) {
@@ -12,9 +12,9 @@ learn_rule <- function(data, folds, nodes, split_preds,
     SL.library <- "SL.mean"
   }
     
-  blip_fit <- origami_SuperLearner(folds = folds, data$Y, data[, nodes$Vnodes], split_preds = split_preds, 
-                                  SL.library = SL.library, family = binomial(), cvfun = split_cv_SL, method = method.surlog(), cts.num = 10,
-                                  ,.parallel=parallel)
+  blip_fit <- origami_SuperLearner(folds = folds, data[,nodes$Ynode], data[, nodes$Vnodes,drop=F], split_preds = split_preds, 
+                                  SL.library = SL.library$blip_library, family = binomial(), cvfun = split_cv_SL, method = method.surlog(), cts.num = 10,
+                                  ,.parallel=parallel,maximize=maximize)
   
   return(blip_fit)
 }
