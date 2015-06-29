@@ -1,4 +1,5 @@
 #learner functions that might help to pick up effect modification, and therefore find a more optimal tx
+#' @export
 SL.glmem <- function(Y, X, newX, family, obsWeights, ...) {
   fit.glm <- glm(Y ~ A * ., data = X, family = family, weights = obsWeights)
   pred <- predict(fit.glm, newdata = newX, type = "response")
@@ -8,6 +9,7 @@ SL.glmem <- function(Y, X, newX, family, obsWeights, ...) {
   return(out)
 }
 
+#' @export
 SL.glmnetem <- function(Y, X, newX, family, obsWeights, id, alpha = 1, nfolds = 10, nlambda = 100, useMin = TRUE, ...) {
   require("glmnet")
   if (!is.matrix(X)) {
@@ -23,6 +25,7 @@ SL.glmnetem <- function(Y, X, newX, family, obsWeights, id, alpha = 1, nfolds = 
   return(out)
 }
 
+#' @export
 predict.SL.glmnetem <- function(object, newdata, ...) {
   if (!is.matrix(newdata)) {
     newdata <- model.matrix(~-1 + A * ., newdata)

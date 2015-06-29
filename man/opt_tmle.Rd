@@ -50,7 +50,6 @@ To avoid nesting cross-validation, it uses split-specfic estimates of Q and g to
 "split-specific" estimates of the rule in CV-TMLE to estimate mean performance
 }
 \examples{
-#todo: add example
 Qbar0 <- function(A, W) {
   W1 <- W[, 1]
   W2 <- W[, 2]

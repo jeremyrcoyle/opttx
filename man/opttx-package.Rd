@@ -22,7 +22,6 @@ LazyLoad: \tab yes\cr
 opttx estimates optimal treatment rules and the mean outcome under such rules
 }
 \examples{
-#todo: add example
 Qbar0 <- function(A, W) {
   W1 <- W[, 1]
   W2 <- W[, 2]
