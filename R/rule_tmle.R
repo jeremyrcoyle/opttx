@@ -1,29 +1,40 @@
 ################################################################ TMLE for dynamic regimes
 
-# TMLE for a rule works by redefining A=1 as 'followed rule' and A=0 as 'didn't follow rule' pA is updated accordingly
-fit_ruletmle <- function(obsA, obsY, pA1, Q0W, Q1W, ruleA) {
-    A <- as.numeric(obsA == ruleA)
-    pA <- pA1 * ruleA + (1 - pA1) * (1 - ruleA)
-    Qd <- Q1W * ruleA + Q0W * (1 - ruleA)
-    tmledata <- data.frame(A = A, Y = obsY, gk = pA, Qk = Qd)
+# TMLE for a rule works by redefining A=1 as 'followed rule' and A=0 as 'didn't
+# follow rule' pA is updated accordingly todo: move to gentmle
+fit_rule_tmle <- function(obsA, obsY, pA, QaW, dV) {
+    Ad <- as.numeric(obsA == dV)
+    dV_ind <- factor_to_indicators(dV)
+    pAd <- rowSums(pA * dV_ind)
+    Qd <- rowSums(QaW * dV_ind)
+    tmledata <- data.frame(A = Ad, Y = obsY, gk = pAd, Qk = Qd)
     gentmle(tmledata, ey1_estimate, ey1_update)
 }
 
-ruletmle <- function(obsA, obsY, pA1, Q0W, Q1W, ruleA) {
-    results <- fit_ruletmle(obsA, obsY, pA1, Q0W, Q1W, ruleA)
-    # put results in a dataframe for ease of usep
-    est <- results$tmleests
-    sd <- sqrt(results$ED2)/sqrt(length(obsA))
+rule_dripcw <- function(DR, dV) {
+    dV_ind <- factor_to_indicators(dV)
+    DR_dV <- rowSums(DR * dV_ind)
+    est <- mean(DR_dV)
+    sd <- sd(DR_dV)/sqrt(length(DR_dV))
     lower <- est - qnorm(0.975) * sd
     upper <- est + qnorm(0.975) * sd
     data.frame(est = est, sd = sd, lower = lower, upper = upper)
 }
 
-# difference of two TMLEs using the delta method note that this may not work because sometimes the rules are nested
-# which means in the limit one rule minus the other rule always has the same sign
-two_ruletmle <- function(obsA, obsY, pA1, Q0W, Q1W, ruleA, rule2A) {
-    results <- fit_ruletmle(obsA, obsY, pA1, Q0W, Q1W, ruleA)
-    results2 <- fit_ruletmle(obsA, obsY, pA1, Q0W, Q1W, rule2A)
+rule_tmle <- function(obsA, obsY, pA, QaW, dV) {
+    results <- fit_rule_tmle(obsA, obsY, pA, QaW, dV)
+    ci <- ci_gentmle(results)
+    ci$parameter <- NULL
+    
+    return(ci)
+}
+
+# difference of two TMLEs using the delta method note that this may not work
+# because sometimes the rules are nested which means in the limit one rule minus
+# the other rule always has the same sign
+two_rule_tmle <- function(obsA, obsY, pA, QaW, dV, dV2) {
+    results <- fit_rule_tmle(obsA, obsY, pA, QaW, dV)
+    results2 <- fit_rule_tmle(obsA, obsY, pA, QaW, dV2)
     # combined results and put in a dataframe for ease of usep
     est <- results$tmleests - results2$tmleests
     sd <- sqrt(mean((results$Dstar[[1]] - results2$Dstar[[1]])^2))/sqrt(length(obsA))
@@ -32,51 +43,46 @@ two_ruletmle <- function(obsA, obsY, pA1, Q0W, Q1W, ruleA, rule2A) {
     data.frame(est = est, sd = sd, lower = lower, upper = upper)
 }
 
-# generates predictions from original dataset from origami_SuperLearner object
-cv_predict_original <- function(osl_fit) {
-    osl_fit$Z %*% osl_fit$coef
-}
 
-# extract the validation sets from split_preds for use in CV-TMLE
-extract_val <- function(fold, split_preds) {
-    v <- fold_index()
-    valid_idx <- validation()
-    
-    val_preds <- sapply(split_preds, function(split_pred) {
-        split_pred[[v]][valid_idx]
-    })
-    val_preds <- as.data.frame(val_preds)
-    val_preds$index <- valid_idx
-    result <- list(preds = val_preds)
-    return(result)
-}
-
-# extract split-specific validation predictions
-extract_vals <- function(folds, split_preds, parallel = F) {
-    
-    val_preds <- cross_validate(extract_val, folds, split_preds, .parallel = parallel)$preds
-    val_preds <- val_preds[order(val_preds$index), ]
-}
-
-all_ests <- function(data, folds, nodes, fits, split_preds, blip_type, parallel = F) {
-    val_preds <- extract_vals(folds, split_preds, parallel)
-    
-    # fit static blip blipfit0=subopt(c('W2'),split_preds,folds,data,SL.library='SL.mean')
-    cv_pblip <- cv_predict_original(fits$blip_fit)
-    cv_optA <- treatment_from_pred(cv_pblip, blip_type)
+estimate_performance <- function(data, nodes, predictions, dV, perf_tmle = TRUE, 
+    perf_dripcw = FALSE) {
     A <- data[, nodes$Anode]
     Y <- data[, nodes$Ynode]
-    ests <- with(val_preds, {
-        est_0 <- ruletmle(A, Y, pA1, Q0W, Q1W, 0)
-        est_1 <- ruletmle(A, Y, pA1, Q0W, Q1W, 1)
-        est_A <- ruletmle(A, Y, pA1, Q0W, Q1W, A)
-        est_opt <- ruletmle(A, Y, pA1, Q0W, Q1W, cv_optA)
-        rbind(est_0, est_1, est_A, est_opt)
-    })
+    A_vals <- vals_from_factor(A)
+    tmle_ests <- NULL
     
-    rules <- c("A=0", "A=1", "A=a", "A=d(V)")
-    ests$rule <- rules
+    if (perf_tmle) {
+        static_ests <- ldply(A_vals, function(A_val) {
+            rule_tmle(A, Y, predictions$pA, predictions$QaW, rep(A_val, length(Y)))
+        })
+        
+        est_A <- rule_tmle(A, Y, predictions$pA, predictions$QaW, A)
+        est_opt <- rule_tmle(A, Y, predictions$pA, predictions$QaW, dV)
+        
+        ests <- rbind(static_ests, est_A, est_opt)
+        rules <- c(sprintf("A=%s", A_vals), "A=a_obs", "A=d(V)")
+        ests$rule <- rules
+        ests$estimator <- "TMLE"
+        tmle_ests <- ests
+    }
     
-    # diffest <- tworuletmle2(data$A, data$Y, cv_pA1, cv_Q0W, cv_Q1W, old_optA, cv_optA)
-    return(ests)
+    dripcw_ests <- NULL
+    if (perf_dripcw) {
+        static_ests <- ldply(A_vals, function(A_val) {
+            rule_dripcw(predictions$DR, rep(A_val, length(Y)))
+        })
+        
+        est_A <- rule_dripcw(predictions$DR, A)
+        est_opt <- rule_dripcw(predictions$DR, dV)
+        
+        ests <- rbind(static_ests, est_A, est_opt)
+        rules <- c(sprintf("A=%s", A_vals), "A=a_obs", "A=d(V)")
+        ests$rule <- rules
+        ests$estimator <- "DR-IPCW"
+        dripcw_ests <- ests
+    }
+    
+    all_ests <- rbind(tmle_ests, dripcw_ests)
+    
+    return(all_ests)
 } 

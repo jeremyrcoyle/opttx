@@ -1,27 +1,79 @@
 
-# fit on subset of covariates V
-learn_rule <- function(data, folds, nodes, split_preds, SL.library = c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", 
-    "SL.rpart", "SL.rpartPrune", "SL.mean"), blip_type, maximize = T, parallel = F) {
+#' @export        
+dV_from_preds <- function(preds) {
+    max.col(preds)
+}
+
+# fit Q on A and subset of covariates V
+learn_rule <- function(data, folds, nodes, split_preds, predictions, parallel = F, 
+    SL.library, verbose, ...) {
     
     if (length(nodes$Vnodes) == 1) {
-        # glmnet expects at least two covariates, so don't use glmnet if we only have one!
-        SL.library <- setdiff(SL.library, "SL.glmnet")
+        # glmnet expects at least two covariates, so don't use glmnet if we only have
+        # one!
+        SL.library$QaV <- setdiff(SL.library$QaV, "SL.glmnet")
+        SL.library$class <- setdiff(SL.library$class, "mnSL.glmnet")
     } else if (length(nodes$Vnodes) == 0) {
-        # if we have no covariates, there's no point in using learners that depend on covariates
-        SL.library <- "SL.mean"
+        
+        # if we have no covariates, there's no point in using learners that depend on
+        # covariates
+        SL.library$QaV <- c()
+        SL.library$class <- "SL.mean"
     }
     
-    if (blip_type == "QbV.mse") {
-        method <- method.NNLS()
-        family <- gaussian()
+    
+    A <- data[, nodes$Anode]
+    A_vals <- vals_from_factor(A)
+    QaV_fits <- NULL
+    if (length(SL.library$QaV) > 0) {
+        message_verbose("Fitting QaV", 2, verbose)
+        QaV_fits <- lapply(seq_along(A_vals), function(A_index) {
+            origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, nodes$Vnodes, 
+                drop = F], split_preds = split_preds, SL.library = SL.library$QaV, 
+                family = gaussian(), cvfun = QaV_cv_SL, A_index = A_index, .parallel = parallel, 
+                ...)
+        })
+    }
+    
+    class_fit <- NULL
+    if (length(SL.library$class) > 0) {
+        message_verbose("Fitting classfication", 2, verbose)
+        class_fit <- multinomial_SuperLearner(folds = folds, data[, nodes$Ynode], 
+            data[, nodes$Vnodes, drop = F], split_preds = split_preds, SL.library = SL.library$class, 
+            cvfun = class_cv_SL, .parallel = parallel)
+        
+    }
+    
+    message_verbose("Fitting Combination (Refitting Weights)", 2, verbose)
+    joint_fit <- joint_sl(QaV_fits, class_fit, predictions, data, risk_generator = create_tmle_risk)
+    
+    rule_object <- list(QaV_fits = QaV_fits, class_fit = class_fit, joint_fit = joint_fit, 
+        nodes = nodes)
+    class(rule_object) <- "opttx_rule"
+    return(rule_object)
+}
+
+
+#' @export
+predict.opttx_rule <- function(rule_object, newdata = "cv-original", pred_fit = c("joint", 
+    "QaV", "class"), return_assignment = TRUE) {
+    
+    pred_fit <- match.arg(pred_fit)
+    
+    if (pred_fit == "QaV") {
+        preds <- sapply(rule_object$QaV_fits, function(fit) predict(fit, newdata)$pred)
+    } else if (pred_fit == "class") {
+        preds <- predict(rule_object$class_fit, newdata)$pred
     } else {
-        method <- method.surlog()
-        family <- binomial()
+        preds <- predict(rule_object$joint_fit, rule_object$QaV_fits, rule_object$class_fit, 
+            newdata)
     }
     
-    blip_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, nodes$Vnodes, drop = F], split_preds = split_preds, 
-        SL.library = SL.library, family = family, cvfun = split_cv_SL, method = method, cts.num = 10, , .parallel = parallel, 
-        blip_type = blip_type, maximize = maximize)
+    if (return_assignment) {
+        dV <- dV_from_preds(preds)
+        return(dV)
+    } else {
+        return(preds)
+    }
     
-    return(blip_fit)
 } 

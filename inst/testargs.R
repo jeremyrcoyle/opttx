@@ -3,9 +3,11 @@ Anode <- "A"
 Ynode <- "Y"
 Vnodes <- Wnodes
 stratifyAY <- TRUE
-Q_library <- c("SL.glm", "SL.glmem", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean")
-g_library <- c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean")
-blip_library <- c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean")
-maximize <- T
-verbose <- 2
-parallel <- F 
+
+
+verbose <- 4
+parallel <- F
+perf_tmle <- T
+perf_dripcw <- T
+perf_cv <- T
+perf_full <- T 
