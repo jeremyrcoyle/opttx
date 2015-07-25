@@ -4,8 +4,10 @@ Qbar0 <- function(A, W) {
     W2 <- W[, 2]
     W3 <- W[, 3]
     W4 <- W[, 4]
-    Qbar <- plogis(ifelse(W4 > 0, (A == 1) + (A == 1) * (5 * W1^2 - 4.45), (A == 
-        2) + (A == 3) + (A == 2) * (4 * W2) + (A == 3) * (5 * W3)))
+    # Qbar <- plogis(ifelse(W4 > 0, (A == 1) + (A == 1) * (5 * W1^2 - 4.45), (A == 2)
+    # + (A == 3) + (A == 2) * (4 * W2) + (A == 3) * (5 * W3)))
+    Qbar <- plogis((A == 1) * (1 + 5 * W1^2 - 4.45) + (A == 2) * (-1 + 4 * W2) + 
+        (1 + 5 * W3) + 5 * W3 * sin(W4))
     return(Qbar)
 }
 
@@ -64,7 +66,6 @@ EYd0_perf <- mean(Qbar0(testdata$d0, testdata[, Wnodes]))
 c(QaV_perf, class_perf, joint_perf, EYd0_perf)
 # perf of true blip approx=0.748
 
-print(result)
 plot(result)
 
 vim <- tx_vim(result)

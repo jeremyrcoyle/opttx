@@ -96,8 +96,8 @@ sub_rule <- function(opt_obj, V) {
         return_assignment = F)
     reduced_preds <- lapply(reduced_fits, predict, newdata = "cv-original", pred_fit = "joint", 
         return_assignment = F)
-    diff_dfs <- lapply(reduced_dV, function(reduced_pred) {
-        data.frame(diff = factor_to_indicators(reduced_pred) - factor_to_indicators(full_dV))
+    diff_dfs <- lapply(reduced_preds, function(reduced_pred) {
+        data.frame(diff = reduced_pred - full_preds)
     })
     diff_dfs <- mapply(function(df, node) {
         df$node <- node
@@ -111,20 +111,20 @@ sub_rule <- function(opt_obj, V) {
     head(long)
     ggplot(long, aes(x = val, y = value, color = variable)) + facet_wrap(~node) + 
         geom_smooth(method = "loess") + geom_rug(alpha = 0.2, sides = "b")
-    full_dV <- predict(rule_fit, newdata = "cv-original", pred_fit = "joint")
-    reduced_dV <- lapply(reduced_fits, predict, newdata = "cv-original", pred_fit = "joint")
+    full_dV <- max.col(full_preds)
+    reduced_dV <- lapply(reduced_preds, max.col)
     
     full_EYd <- with(opt_obj, rule_tmle(data$A, data$Y, val_preds$pA, val_preds$QaW, 
         full_dV))
     reduced_EYd <- with(opt_obj, ldply(reduced_dV, function(dV) two_rule_tmle(data$A, 
         data$Y, val_preds$pA, val_preds$QaW, full_dV, dV)))
-    
+    reduced_EYd
     test_reduced_dV <- lapply(reduced_fits, function(fit) predict(fit, newdata = testdata[, 
         fit$nodes$Vnodes], pred_fit = "joint"))
-    reduced_E0Yd <- colMeans(sapply(test_reduced_preds, Qbar0, testdata[, newnodes$Wnodes]))
+    reduced_E0Yd <- colMeans(sapply(test_reduced_dV, Qbar0, testdata[, newnodes$Wnodes]))
     test_full_dV <- predict(rule_fit, newdata = testdata[, Vnodes], pred_fit = "joint")
     z <- sapply(reduced_dV, function(pred_dV) mean(full_dV == pred_dV))
-    z0 <- sapply(test_reduced_dV, function(pred_dV) mean(test_full_preds == pred_dV))
+    z0 <- sapply(test_reduced_dV, function(pred_dV) mean(test_full_dV == pred_dV))
     plot(z0, z)
     full_E0Yd <- mean(Qbar0(test_full_dV, testdata[, newnodes$Wnodes]))
     diff0 <- full_E0Yd - reduced_E0Yd
