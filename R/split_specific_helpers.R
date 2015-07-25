@@ -1,6 +1,7 @@
 
 # split specific predictions for Q and g and derived quantities
-opttx_split_preds <- function(fold, data, nodes, fits, use_full = F) {
+opttx_split_preds <- function(fold, data, nodes, fits, use_full = F, maximize = T, 
+    ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()
@@ -27,12 +28,11 @@ opttx_split_preds <- function(fold, data, nodes, fits, use_full = F) {
     A_ind <- factor_to_indicators(A)
     Y_mat <- replicate(length(A_vals), Y)
     DR <- (A_ind/pA) * (Y_mat - QaW) + QaW
-    blip1 <- sweep(DR, 1, DR[, 1], "-")
-    blip2 <- sweep(DR, 1, mean(DR), "-")
-    blip3 <- sweep(DR, 1, rowSums(DR * pA), "-")
-    Z <- apply(DR, 1, which.max)
     
-    list(QaW = QaW, pA = pA, DR = DR, Z = Z, blip1 = blip1, blip2 = blip2, blip3 = blip3)  #, Y=Y, A=A)
+    K <- (2 - maximize) * DR  #flip sign on DR if we're trying to minimize
+    Z <- max.col(DR)
+    
+    list(QaW = QaW, pA = pA, DR = DR, Z = Z, K = K)  #, Y=Y, A=A)
 }
 
 # ignores Y and instead uses Z generated from a split-specific training set
@@ -44,9 +44,20 @@ QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, use_full =
     train_idx <- training()
     valid_idx <- validation()
     
-    DR <- split_preds[[blip_type]][[v]][, A_index]
+    K <- split_preds[["K"]][[v]]
+    K_a <- K[, A_index]
+    if (blip_type == "blip1") {
+        to_predict <- K_a - K[, 1]
+    } else if (blip_type == "blip2") {
+        to_predict <- K_a - rowMeans(K)
+    } else if (blip_type == "blip3") {
+        pA <- split_preds[["pA"]][[v]]
+        to_predict <- K_a - rowSums(K * pA)
+    } else {
+        to_predict <- K_a
+    }
     
-    cv_SL(fold, DR, X, SL.library, family, obsWeights, id)
+    cv_SL(fold, to_predict, X, SL.library, family, obsWeights, id)
 }
 
 #' @export

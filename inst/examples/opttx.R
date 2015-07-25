@@ -35,7 +35,7 @@ gen_data <- function(n = 1000, p = 4) {
     u <- runif(n)
     Y <- as.numeric(u < Qbar0(A, W))
     Q0aW <- sapply(A_vals, Qbar0, W)
-    d0 <- apply(Q0aW, 1, which.max)
+    d0 <- max.col(Q0aW)
     Yd0 <- as.numeric(u < Qbar0(d0, W))
     data.frame(W, A, Y, Q0aW, d0, Yd0)
 }
@@ -48,26 +48,26 @@ opt_tmle.SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.ste
     "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"), QaV = c("SL.glm", "SL.glmnetprob", 
     "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c())
 
-sim<-function(iteration){
+sim <- function(iteration) {
     data <- gen_data(1000, 5)
     result <- opt_tmle(data, SL.library = opt_tmle.SL.library)
     Wnodes <- result$nodes$Wnodes
-
+    
     QaV_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "QaV")
-    QaV_perf=mean(Qbar0(QaV_dV, testdata[, Wnodes]))
-    EYd_dV<- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")
-    EYd_perf=mean(Qbar0(EYd_dV, testdata[, Wnodes]))
-    perf<-data.frame(blip_type,EYd_perf,QaV_perf)
-
-    other_blips=c("blip1","blip2","blip3")
-    other_perf=ldply(other_blips,function(blip_type){
-        other_fit=with(result,learn_rule(data, folds, nodes, split_preds, val_preds, parallel = F, 
-                SL.library = SL.library, verbose, blip_type=blip_type))
+    QaV_perf <- mean(Qbar0(QaV_dV, testdata[, Wnodes]))
+    EYd_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")
+    EYd_perf <- mean(Qbar0(EYd_dV, testdata[, Wnodes]))
+    perf <- data.frame(blip_type, EYd_perf, QaV_perf)
+    
+    other_blips <- c("blip1", "blip2", "blip3")
+    other_perf <- ldply(other_blips, function(blip_type) {
+        other_fit <- with(result, learn_rule(data, folds, nodes, split_preds, val_preds, 
+            parallel = F, SL.library = SL.library, verbose, blip_type = blip_type))
         QaV_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "QaV")
-        QaV_perf=mean(Qbar0(QaV_dV, testdata[, Wnodes]))
-        EYd_dV<- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")
-        EYd_perf=mean(Qbar0(EYd_dV, testdata[, Wnodes]))
-        data.frame(blip_type,EYd_perf,QaV_perf)
+        QaV_perf <- mean(Qbar0(QaV_dV, testdata[, Wnodes]))
+        EYd_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")
+        EYd_perf <- mean(Qbar0(EYd_dV, testdata[, Wnodes]))
+        data.frame(blip_type, EYd_perf, QaV_perf)
     })
 }
 mean(Qbar0(testdata$d0, testdata[, Wnodes]))

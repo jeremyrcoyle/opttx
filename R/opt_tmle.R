@@ -22,10 +22,10 @@ opt_tmle.SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.ste
 #' @example /inst/examples/opttx.R
 #' 
 #' @export
-opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = T), Anode = "A", 
+opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode = "A", 
     Ynode = "Y", Vnodes = Wnodes, stratifyAY = TRUE, SL.library = opt_tmle.SL.library, 
-    verbose = 3, parallel = F, perf_tmle = T, perf_dripcw = F, perf_cv = T, perf_full = F, 
-    ...) {
+    verbose = 3, parallel = FALSE, perf_tmle = TRUE, perf_dripcw = FALSE, perf_cv = TRUE, 
+    perf_full = FALSE, maximize = TRUE, ...) {
     
     # ensure A is a factor
     data[, Anode] <- as.factor(data[, Anode])
@@ -36,9 +36,6 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = T), Anode = 
     } else {
         folds <- make_folds(V = 10)
     }
-    
-    # if (!maximize) { todo:reimplement inversion of Y for adverse outcomes!  perhaps
-    # easiest in opttx_split_preds }
     
     # possibly we should make these lists the arguments directly (ltmle does this for
     # SL.library, but not for nodes)
@@ -62,8 +59,8 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = T), Anode = 
     
     # get split-specific predictions, as well as class and weight for rule learning
     message_verbose("Getting split-specific predictions", 2, verbose)
-    split_preds <- cross_validate(opttx_split_preds, folds, data, nodes, fits, .combine = F, 
-        .parallel = parallel)
+    split_preds <- cross_validate(opttx_split_preds, folds, data, nodes, fits, maximize = maximize, 
+        .combine = F, .parallel = parallel)
     
     val_preds <- extract_vals(folds, split_preds)
     
