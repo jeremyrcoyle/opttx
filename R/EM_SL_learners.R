@@ -20,6 +20,9 @@ SL.glmnetprob <- function(Y, X, newX, family, obsWeights, id, alpha = 1, nfolds 
         newX <- model.matrix(~-1 + ., newX)
     }
     
+    if (!(all(is.finite(Y)) && all(is.finite(obsWeights)))) 
+        browser()
+    
     if ((length(unique(Y)) > 2) & family$family == "binomial") {
         Y <- cbind(1 - Y, Y)
     }

@@ -62,9 +62,10 @@ g0 <- function(W) {
     W4 <- W[, 4]
     
     # rep(0.5, nrow(W))
-    A1 <- plogis(W1)
-    A2 <- plogis(W2)
-    A3 <- plogis(W3)
+    scale_factor <- 0.8
+    A1 <- plogis(scale_factor * W1)
+    A2 <- plogis(scale_factor * W2)
+    A3 <- plogis(scale_factor * W3)
     A <- cbind(A1, A2, A3)
     
     # make sure A sums to 1
@@ -92,32 +93,22 @@ testdata <- gen_data(1e+05, 5)
 opt_tmle.SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.step.forward", 
     "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), g = c("mnSL.randomForest", 
     "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"), QaV = c("SL.glm", "SL.glmnetprob", 
-    "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c())
+    "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c("mnSL.randomForest", 
+    "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"))
 
-sim <- function(iteration) {
-    data <- gen_data(1000, 5)
-    result <- opt_tmle(data, SL.library = opt_tmle.SL.library)
-    Wnodes <- result$nodes$Wnodes
-    
-    QaV_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "QaV")
-    QaV_perf <- mean(Qbar0(QaV_dV, testdata[, Wnodes]))
-    EYd_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")
-    EYd_perf <- mean(Qbar0(EYd_dV, testdata[, Wnodes]))
-    perf <- data.frame(blip_type, EYd_perf, QaV_perf)
-    
-    other_blips <- c("blip1", "blip2", "blip3")
-    other_perf <- ldply(other_blips, function(blip_type) {
-        other_fit <- with(result, learn_rule(data, folds, nodes, split_preds, val_preds, 
-            parallel = F, SL.library = SL.library, verbose, blip_type = blip_type))
-        QaV_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "QaV")
-        QaV_perf <- mean(Qbar0(QaV_dV, testdata[, Wnodes]))
-        EYd_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")
-        EYd_perf <- mean(Qbar0(EYd_dV, testdata[, Wnodes]))
-        data.frame(blip_type, EYd_perf, QaV_perf)
-    })
-}
-mean(Qbar0(testdata$d0, testdata[, Wnodes]))
-# perf of true blip approx=0.758
+data <- gen_data(1000, 5)
+result <- opt_tmle(data, SL.library = opt_tmle.SL.library)
+print(result)
+Wnodes <- result$nodes$Wnodes
+QaV_dV <- predict(result, newdata = testdata[, Wnodes], pred_fit = "QaV")
+QaV_perf <- mean(Qbar0(QaV_dV, testdata[, Wnodes]))
+class_dV <- predict(result, newdata = testdata[, Wnodes], pred_fit = "class")
+class_perf <- mean(Qbar0(class_dV, testdata[, Wnodes]))
+joint_dV <- predict(result, newdata = testdata[, Wnodes], pred_fit = "joint")
+joint_perf <- mean(Qbar0(joint_dV, testdata[, Wnodes]))
+EYd0_perf <- mean(Qbar0(testdata$d0, testdata[, Wnodes]))
+c(QaV_perf, class_perf, joint_perf, EYd0_perf)
+# perf of true blip approx=0.748
 
 print(result)
 plot(result)

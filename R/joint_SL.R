@@ -1,8 +1,8 @@
 
 #' @export
-create_tmle_risk <- function(Z, data, predictions) {
-    A <- data$A
-    Y <- data$Y
+create_tmle_risk <- function(Z, data, nodes, predictions) {
+    A <- data[, nodes$Anode]
+    Y <- data[, nodes$Ynode]
     
     A_vals <- vals_from_factor(A)
     pA <- predictions$pA
@@ -16,9 +16,7 @@ create_tmle_risk <- function(Z, data, predictions) {
     }
 }
 
-create_dripcw_risk <- function(Z, data, predictions) {
-    A <- data$A
-    Y <- data$Y
+create_dripcw_risk <- function(Z, data, nodes, predictions) {
     
     A_vals <- vals_from_factor(A)
     nA <- length(A_vals)
@@ -65,13 +63,13 @@ create_predmat <- function(QaV_fits, class_fit, newdata = "cv-original") {
 }
 
 # combine QaV and class_fits
-joint_sl <- function(QaV_fits, class_fit, predictions, data, risk_generator = create_tmle_risk) {
+joint_sl <- function(QaV_fits, class_fit, predictions, data, nodes, risk_generator = create_tmle_risk) {
     
     # evaluate combined coefficient, plus a small number of random starting points to
     # find a good neighborhood
     jsl_obj <- create_predmat(QaV_fits, class_fit, "cv-original")
     num_alg <- length(jsl_obj$init_coef)
-    risk_fun <- risk_generator(jsl_obj$Z, data, predictions)
+    risk_fun <- risk_generator(jsl_obj$Z, data, nodes, predictions)
     simplex.grid <- simplex.sample(num_alg, 30)$samples
     starts <- rbind(simplex.grid, jsl_obj$init_coef)
     start_risk <- apply(starts, 1, risk_fun)

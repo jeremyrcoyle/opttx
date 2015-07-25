@@ -45,7 +45,7 @@ learn_rule <- function(data, folds, nodes, split_preds, predictions, parallel = 
     }
     
     message_verbose("Fitting Combination (Refitting Weights)", 2, verbose)
-    joint_fit <- joint_sl(QaV_fits, class_fit, predictions, data, risk_generator = create_tmle_risk)
+    joint_fit <- joint_sl(QaV_fits, class_fit, predictions, data, nodes, risk_generator = create_tmle_risk)
     
     rule_object <- list(QaV_fits = QaV_fits, class_fit = class_fit, joint_fit = joint_fit, 
         nodes = nodes)
