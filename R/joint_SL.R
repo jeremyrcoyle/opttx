@@ -29,15 +29,13 @@ create_dripcw_risk <- function(Z, data, nodes, predictions) {
         -1 * nA * mean(factor_to_indicators(dV) * val_preds$DR)
     }
 }
-create_predmat <- function(QaV_fits, class_fit, newdata = "cv-original") {
+create_predmat <- function(QaV_fit, class_fit, newdata = "cv-original") {
     QaV_Z <- NULL
     QaV_coef <- c()
-    if (!is.null(QaV_fits)) {
-        QaV_Zs <- lapply(QaV_fits, function(fit) predict(fit, newdata)$library_pred)
-        QaV_Z <- do.call(abind, c(QaV_Zs, rev.along = 0))
-        QaV_Z <- aperm(QaV_Z, c(1, 3, 2))
+    if (!is.null(QaV_fit)) {
+        QaV_Z <- predict(QaV_fit, newdata)$library_pred
         
-        QaV_coef <- rowMeans(sapply(QaV_fits, "[[", "coef"))
+        QaV_coef <- QaV_fit$coef
     }
     
     class_Z <- NULL
@@ -63,11 +61,11 @@ create_predmat <- function(QaV_fits, class_fit, newdata = "cv-original") {
 }
 
 # combine QaV and class_fits
-joint_sl <- function(QaV_fits, class_fit, predictions, data, nodes, risk_generator = create_tmle_risk) {
+joint_sl <- function(QaV_fit, class_fit, predictions, data, nodes, risk_generator = create_tmle_risk) {
     
     # evaluate combined coefficient, plus a small number of random starting points to
     # find a good neighborhood
-    jsl_obj <- create_predmat(QaV_fits, class_fit, "cv-original")
+    jsl_obj <- create_predmat(QaV_fit, class_fit, "cv-original")
     num_alg <- length(jsl_obj$init_coef)
     risk_fun <- risk_generator(jsl_obj$Z, data, nodes, predictions)
     simplex.grid <- simplex.sample(num_alg, 30)$samples
@@ -81,7 +79,7 @@ joint_sl <- function(QaV_fits, class_fit, predictions, data, nodes, risk_generat
     fit <- nloptr(x0 = optim_init, eval_f = risk_fun, lb = rep(0, num_alg), opts = list(algorithm = "NLOPT_LN_SBPLX", 
         ftol_rel = 1/n, maxeval = n))
     
-    jsl_obj$coef <- fit$solution
+    jsl_obj$coef <- normalize(fit$solution)
     class(jsl_obj) <- "joint_sl"
     return(jsl_obj)
 }

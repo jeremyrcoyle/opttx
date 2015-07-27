@@ -28,10 +28,10 @@ Qbar0 <- function(A, W) {
     W2 <- W[, 2]
     W3 <- W[, 3]
     W4 <- W[, 4]
-    # Qbar <- plogis(ifelse(W4 > 0, (A == 1) + (A == 1) * (5 * W1^2 - 4.45), (A == 2)
-    # + (A == 3) + (A == 2) * (4 * W2) + (A == 3) * (5 * W3)))
-    Qbar <- plogis((A == 1) * (1 + 5 * W1^2 - 4.45) + (A == 2) * (-1 + 4 * W2) + 
-        (1 + 5 * W3) + 5 * W3 * sin(W4))
+    Qbar <- plogis(ifelse(W4 > 0, (A == 1) + (A == 1) * (5 * W1^2 - 4.45), (A == 
+        2) + (A == 3) + (A == 2) * (4 * W2) + (A == 3) * (5 * W3)))
+    # Qbar <- plogis((A == 1) * (1 + 5 * W1^2 - 4.45) + (A == 2) * (-1 + 4 * W2) + (1
+    # + 5 * W3) + 5 * W3 * sin(W4))
     return(Qbar)
 }
 
@@ -76,6 +76,8 @@ opt_tmle.SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.ste
     "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c("mnSL.randomForest", 
     "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"))
 
+
+nodes <- list(Wnodes = Wnodes, Anode = Anode, Ynode = "Ystar", Vnodes = Vnodes)
 data <- gen_data(1000, 5)
 result <- opt_tmle(data, SL.library = opt_tmle.SL.library)
 print(result)

@@ -33,39 +33,48 @@ opttx_split_preds <- function(fold, data, nodes, fits, use_full = F, ...) {
     list(QaW = QaW, pA = pA, DR = DR, Z = Z)  #, Y=Y, A=A)
 }
 
-# ignores Y and instead uses Z generated from a split-specific training set
-# generated using cv_split_preds X are the nodes to base the rule on
-#' @export
-QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, use_full = F, 
-    split_preds, A_index, blip_type = "DR", ...) {
+# todo: reintroduce binary versions of these based on blips
+QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, 
+    full_preds, blip_type = "DR", use_full = F, ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()
     
-    DR <- split_preds[["DR"]][[v]]
-    DR_a <- DR[, A_index]
-    if (blip_type == "blip1") {
-        to_predict <- DR_a - DR[, 1]
-    } else if (blip_type == "blip2") {
-        to_predict <- DR_a - rowMeans(DR)
-    } else if (blip_type == "blip3") {
-        pA <- split_preds[["pA"]][[v]]
-        to_predict <- DR_a - rowSums(DR * pA)
+    if ((all.equal(train_idx, valid_idx) == T) || use_full) {
+        preds <- full_preds
     } else {
-        to_predict <- DR_a
+        preds <- lapply(split_preds, "[[", v)
+    }
+    
+    DR <- preds[["DR"]]
+    if (blip_type == "blip1") {
+        to_predict <- DR - DR[, 1]
+    } else if (blip_type == "blip2") {
+        to_predict <- DR - rowMeans(DR)
+    } else if (blip_type == "blip3") {
+        pA <- preds[["pA"]]
+        to_predict <- DR - rowSums(DR * pA)
+    } else {
+        to_predict <- DR
     }
     
     cv_SL(fold, to_predict, X, SL.library, family, obsWeights, id)
 }
-
 #' @export
-class_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, use_full = F, 
-    split_preds, ...) {
+class_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, 
+    full_preds, use_full = F, ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()
     
-    Z <- split_preds$Z[[v]]
+    
+    if ((all.equal(train_idx, valid_idx) == T) || use_full) {
+        preds <- full_preds
+    } else {
+        preds <- lapply(split_preds, "[[", v)
+    }
+    
+    Z <- preds$Z
     
     cv_SL(fold, Z, X, SL.library, family, obsWeights, id)
 }

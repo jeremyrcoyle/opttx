@@ -37,6 +37,14 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
         folds <- make_folds(V = 10)
     }
     
+    # Y=data[,nodes$Ynode] X=data[,c(nodes$Anode,nodes$Wnodes)] osl_args<-
+    # list(family = binomial(), SL.library = SL.library$Q, cts.num = 5, .parallel =
+    # parallel, method = method.NNloglik(), control = list(trimLogit = 1e-05))
+    
+    # split=split_SL(folds,Y,X,osl_args)
+    # full=split_SL(folds,Y,X,osl_args,approach='full')
+    # nested=split_SL(folds,Y,X,osl_args,approach='full')
+    
     data$Ystar <- data[, Ynode]
     if (!maximize) {
         minY <- min(data$Ystar)
@@ -51,14 +59,18 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     # fit Q and g
     message_verbose("Fitting Q", 1, verbose)
     # todo: add support for continuous Y
-    Q_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, c(nodes$Anode, 
+    Q_fit_args <- list(folds = folds, Y = data[, nodes$Ynode], X = data[, c(nodes$Anode, 
         nodes$Wnodes)], family = binomial(), SL.library = SL.library$Q, cts.num = 5, 
         .parallel = parallel, method = method.NNloglik(), control = list(trimLogit = 1e-05))
+    Q_fit <- split_from_args(Q_fit_args)
+    # Q_fit_full <- split_to_full(Q_fit) Q_fit_nested <-
+    # split_to_nested(Q_fit,Q_fit_args)
     Q_fit <- drop_zero_learners(Q_fit)
     
     message_verbose("Fitting g", 1, verbose)
-    g_fit <- origami_SuperLearner(folds = folds, data[, nodes$Anode], data[, nodes$Wnodes], 
+    g_fit_args <- list(folds = folds, Y = data[, nodes$Anode], X = data[, nodes$Wnodes], 
         SL.library = SL.library$g, family = list(family = "multinomial"), method = method.mnNNloglik())
+    g_fit <- split_from_args(g_fit_args)
     g_fit <- drop_zero_learners(g_fit)
     fits <- list(Q_fit = Q_fit, g_fit = g_fit)
     
@@ -70,12 +82,11 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     split_preds <- cross_validate(opttx_split_preds, folds, data, nodes, fits, .combine = F, 
         .parallel = parallel)
     
+    full_preds <- opttx_split_preds(folds[[1]], data, nodes, fits, useFull = T)
     val_preds <- extract_vals(folds, split_preds)
     
-    
-    
-    fits$rule_fit <- learn_rule(data, folds, nodes, split_preds, val_preds, parallel = F, 
-        SL.library = SL.library, verbose)  #, ...)
+    fits$rule_fit <- learn_rule(data, folds, nodes, split_preds, full_preds, val_preds, 
+        parallel = F, SL.library = SL.library, verbose)  #, ...)
     
     # estimate performance
     cv_dV <- predict(fits$rule_fit, newdata = "cv-original", pred_fit = "joint")

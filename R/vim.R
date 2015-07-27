@@ -79,71 +79,82 @@ tx_vim <- function(opt_obj, verbose = 2) {
 
 sub_rule <- function(opt_obj, V) {
     opt_obj <- result
-    rule_fit <- opt_obj$fits$rule_fit
-    val_preds <- with(opt_obj, extract_vals(folds, split_preds))
+    full_fit <- opt_obj$fits$rule_fit
     
-    # invert -- calc all parameters for each reduced, then extract from lists write
-    # calc parameter function so can also apply to full
+    # fit rules on all subsets V_i\V
     newnodes <- opt_obj$nodes
     Vnodes <- newnodes$Vnodes
-    reduced_fits <- lapply(Vnodes, function(drop_Vnode) {
-        newnodes$Vnodes <- setdiff(opt_obj$nodes$Vnodes, drop_Vnode)
-        reduced_fit <- with(opt_obj, learn_rule(data, folds, newnodes, split_preds, 
-            val_preds, parallel = F, SL.library = SL.library, verbose = 3))
+    system.time({
+        reduced_fits <- lapply(Vnodes, function(drop_Vnode) {
+            newnodes$Vnodes <- setdiff(opt_obj$nodes$Vnodes, drop_Vnode)
+            reduced_fit <- with(opt_obj, learn_rule(data, folds, newnodes, split_preds, 
+                val_preds, parallel = F, SL.library = SL.library, verbose = 3))
+        })
     })
+    testsamp <- data[, Vnodes]
+    testsamp[, -1] <- testsamp[1, -1]
     
-    full_preds <- predict(rule_fit, newdata = "cv-original", pred_fit = "joint", 
-        return_assignment = F)
-    reduced_preds <- lapply(reduced_fits, predict, newdata = "cv-original", pred_fit = "joint", 
-        return_assignment = F)
-    diff_dfs <- lapply(reduced_preds, function(reduced_pred) {
-        data.frame(diff = reduced_pred - full_preds)
+    system.time({
+        stupid <- merge(data[, 1, drop = F], data[, -1])
+        z <- get_test_preds(full_fit, stupid)
     })
-    diff_dfs <- mapply(function(df, node) {
-        df$node <- node
-        df$val <- data[, node]
-        df
-    }, df = diff_dfs, node = Vnodes, SIMPLIFY = F)
-    diff_df <- do.call(rbind, diff_dfs)
-    head(diff_df)
-    long <- melt(diff_df, id = c("node", "val"))
+    z
+    get_cv_preds <- function(fit) {
+        predict(fit, newdata = "cv-original", pred_fit = "joint", return_assignment = F)
+    }
+    preds_to_dV <- max.col
+    EYd <- function(dV) {
+        with(opt_obj, rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], val_preds$pA, 
+            val_preds$QaW, dV))
+    }
+    EYd_comp <- function(reduced_dV, full_dV) {
+        with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], val_preds$pA, 
+            val_preds$QaW, full_dV, reduced_dV))
+    }
     
-    head(long)
+    full_preds <- get_cv_preds(full_fit)
+    full_dV <- preds_to_dV(full_preds)
+    full_EYd <- EYd(dV)
+    
+    reduced_preds <- lapply(reduced_fits, get_cv_preds)
+    reduced_dV <- lapply(reduced_preds, preds_to_dV)
+    reduced_EYd_comp <- ldply(reduced_dV, EYd_comp, full_dV)
+    n <- nrow(opt_obj$data)
+    reduced_loglik <- -1 * sapply(reduced_preds, origami:::mn_loglik, full_dV, rep(1, 
+        n))
+    risk_01 <- function(x, y) {
+        mean(x != y)
+    }
+    reduced_01 <- sapply(reduced_dV, risk_01, full_dV)
+    reduced_dV_diff <- lapply(reduced_dV, `-`, full_dV)
+    get_test_preds <- function(fit, test_data) {
+        predict(fit, newdata = test_data[, fit$nodes$Vnodes], pred_fit = "joint", 
+            return_assignment = F)
+    }
+    test_EYd <- function(dV, testdata) {
+        mean(Qbar0(dV, testdata[, nodes$Wnodes]))
+    }
+    full_test_preds <- get_test_preds(full_fit, testdata)
+    full_test_dV <- preds_to_dV(full_test_preds)
+    full_test_EYd <- test_EYd(full_test_dV, testdata)
+    
+    
+    reduced_test_preds <- lapply(reduced_fits, get_test_preds, testdata)
+    reduced_test_dV <- lapply(reduced_test_preds, preds_to_dV)
+    reduced_test_EYd <- sapply(reduced_test_dV, test_EYd, testdata)
+    reduced_test_EYd_comp <- full_test_EYd - reduced_test_EYd
+    reduced_EYd_comp$test_est <- reduced_test_EYd_comp
+    reduced_test_01 <- sapply(reduced_test_dV, risk_01, full_test_dV)
+    reduced_test_loglik <- -1 * sapply(reduced_test_preds, origami:::mn_loglik, full_test_dV, 
+        rep(1, nrow(testdata)))
+    list(preds = preds, dV = dV, EYd = EYd)
+    diff_preds <- full$preds - reduced$preds
+    diff_dV <- full$dV - reduced$dV
+    diff_EYd <- with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], 
+        val_preds$pA, val_preds$QaW, full$dV, reduced$dV))
+    
     ggplot(long, aes(x = val, y = value, color = variable)) + facet_wrap(~node) + 
         geom_smooth(method = "loess") + geom_rug(alpha = 0.2, sides = "b")
-    full_dV <- max.col(full_preds)
-    reduced_dV <- lapply(reduced_preds, max.col)
-    
-    full_EYd <- with(opt_obj, rule_tmle(data$A, data$Y, val_preds$pA, val_preds$QaW, 
-        full_dV))
-    reduced_EYd <- with(opt_obj, ldply(reduced_dV, function(dV) two_rule_tmle(data$A, 
-        data$Y, val_preds$pA, val_preds$QaW, full_dV, dV)))
-    reduced_EYd
-    test_reduced_dV <- lapply(reduced_fits, function(fit) predict(fit, newdata = testdata[, 
-        fit$nodes$Vnodes], pred_fit = "joint"))
-    reduced_E0Yd <- colMeans(sapply(test_reduced_dV, Qbar0, testdata[, newnodes$Wnodes]))
-    test_full_dV <- predict(rule_fit, newdata = testdata[, Vnodes], pred_fit = "joint")
-    z <- sapply(reduced_dV, function(pred_dV) mean(full_dV == pred_dV))
-    z0 <- sapply(test_reduced_dV, function(pred_dV) mean(test_full_dV == pred_dV))
-    plot(z0, z)
-    full_E0Yd <- mean(Qbar0(test_full_dV, testdata[, newnodes$Wnodes]))
-    diff0 <- full_E0Yd - reduced_E0Yd
-    plot(diff0, reduced_EYd$est)
-    newnodes$Vnodes <- setdiff(opt_obj$nodes$Vnodes, "W5")
-    rule_fit3 <- with(opt_obj, learn_rule(data, folds, newnodes, split_preds, val_preds, 
-        parallel = F, SL.library = SL.library, verbose = 3))
-    
-    cv_pdV <- with(rule_fit, predict(joint_fit, QaV_fits, class_fit, newdata = "cv-original"))
-    
-    cv_pdV3 <- with(rule_fit3, predict(joint_fit, QaV_fits, class_fit, newdata = "cv-original"))
-    quantile(cv_pdV - cv_pdV2)
-    quantile(cv_pdV - cv_pdV3)
-    
-    
-    library(reshape2)
-    
-    ggplot(dropdata, aes(x = var, y = value, color = variable)) + geom_smooth(method = "loess") + 
-        facet_wrap(~name) + theme_bw()
 }
 test <- function(opt_obj) {
     newnodes <- opt_obj$nodes

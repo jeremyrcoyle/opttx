@@ -44,6 +44,21 @@ blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, Q_fit,
     # cv_SL(fold, D1, X[,V,drop=F], SL.library, family, obsWeights, id, ...)
 }
 
+fitQ <- function(folds = folds, Y, X, SL.library = Qlibrary) {
+    origami_SuperLearner(folds = folds, Y, X, family = binomial(), SL.library = SL.library, 
+        cts.num = 5, nfolds = 5)
+}
+
+fit_Q <- function(data, folds, nodes, verbose, ...) {
+    # fit Q and g
+    message_verbose("Fitting Q", 1, verbose)
+    # todo: add support for continuous Y
+    Q_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, c(nodes$Anode, 
+        nodes$Wnodes)], family = binomial(), SL.library = SL.library$Q, cts.num = 5, 
+        .parallel = parallel, method = method.NNloglik(), control = list(trimLogit = 1e-05))
+    Q_fit <- drop_zero_learners(Q_fit)
+}
+
 # fully fits Q and g SLs in each fold of rule SL
 nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, 
     fitQ, fitg, ...) {
