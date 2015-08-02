@@ -72,7 +72,7 @@ QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_pred
     
     DR <- preds[["DR"]]
     if (blip_type == "blip1") {
-        to_predict <- DR - DR[, 1]
+        to_predict <- DR[, -1] - DR[, 1]
     } else if (blip_type == "blip2") {
         to_predict <- DR - rowMeans(DR)
     } else if (blip_type == "blip3") {
