@@ -101,5 +101,4 @@ class_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_pr
     Z <- preds$Z
     
     cv_SL(fold, Z, X, SL.library, family, obsWeights, id)
-}
- 
+} 
