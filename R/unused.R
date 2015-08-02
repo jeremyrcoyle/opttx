@@ -99,6 +99,56 @@ nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V,
 }
 
 
+
+# directly optimize the rule performance (estimated using cv-tmle)
+#' @export
+#'
+method.EYd <- function(nuisance_preds) {
+    out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, 
+        obsWeights, ...) {
+        
+        
+        A_vals <- vals_from_factor(nuisance_preds$A)
+        EYd_alpha <- function(alpha) {
+            alpha <- normalize(alpha)
+            dV <- A_vals[dV_from_preds(mn_pred(alpha, Z))]
+            
+            # -1 * nA * mean(factor_to_indicators(dV) * nuisance_preds$DR) #DR-IPCW
+            -1 * rule_tmle(nuisance_preds$A, nuisance_preds$Y, nuisance_preds$pA, 
+                nuisance_preds$QaW, dV)$est
+        }
+        
+        num_alg <- dim(Z)[3]
+        cvRisk <- sapply(seq_len(num_alg), function(i) {
+            alpha <- rep(0, num_alg)
+            alpha[i] <- 1
+            EYd_alpha(alpha)
+        })
+        
+        names(cvRisk) <-libraryNames
+        
+        starts <- simplex.sample(num_alg, 30)$samples
+        start_risk <- apply(starts, 1, EYd_alpha)
+        optim_init <- starts[which.min(start_risk), ]
+        
+        # optimize starting in that neighborhood
+        n <- dim(Z)[1]
+        fit <- nloptr(x0 = optim_init, eval_f = EYd_alpha, lb = rep(0, num_alg), 
+            opts = list(algorithm = "NLOPT_LN_SBPLX", ftol_rel = 1/n, maxeval = n))
+        
+        coef <- normalize(fit$solution)
+        
+        names(coef) <-libraryNames
+        
+        out <- list(cvRisk = cvRisk, coef = coef)
+        return(out)
+    }, computePred = function(predY, coef, ...) {
+        out <- mn_pred(coef,predY)
+        return(out)
+    })
+    invisible(out)
+}
+
 # alex's log loss for weighted classification based opt tx approach
 #' @export
 #'
@@ -186,4 +236,52 @@ method.probloglik <- function() {
         return(out)
     })
     invisible(out)
+}
+
+refit_split <- function(fold, fit, ...) {
+    Z <- fit$Z
+    Y <- fit$valY
+    weights <- fit$valWeights
+    
+    train_Z <- index_dim(Z, training())
+    train_Y <- training(Y)
+    train_weights <- training(weights)
+    
+    valid_Y <- validation(fit$valY)
+    valid_Z <- index_dim(Z, validation())
+    
+    
+    coef <- fit$fullFit$method$computeCoef(train_Z, train_Y, names(fit$cvRisk), 
+        T, obsWeights = train_weights, ...)$coef
+    
+    fit$coef=coef
+    fit$fullFit$coef=coef
+    for(i in 1:length(fit$foldFits)){
+        fit$foldFits[[i]]$coef=coef
+    }
+    
+    return(list(fit=list(fit)))
+}
+
+marginalize_V <- function() {
+    V <- 1
+    newdata <- data[, Vnodes]
+    fit <- fits$rule_fit$QaV_fit
+    dropV <- newdata[, -V, drop = F]
+    V <- newdata[, V, drop = F]
+    Rprof(tmp <- tempfile())
+    test <- ldply(1:1, function(row) {
+        combined <- merge(dropV[row, ], V)
+        head(combined)
+        preds <- predict(fit, newdata = combined)$pred
+        colMeans(preds)
+    })
+    Rprof()
+    summaryRprof(tmp)
+    
+    
+    # allnew=merge(newdata[,V,drop=F],newdata[,-V])
+    
+    
+    
 } 

@@ -28,7 +28,7 @@ learn_rule <- function(data, folds, nodes, split_preds, full_preds, predictions,
         QaV_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, 
             nodes$Vnodes, drop = F], split_preds = split_preds, full_preds = full_preds, 
             SL.library = SL.library$QaV, family = gaussian(), cvfun = QaV_cv_SL, 
-            .parallel = parallel, method = method.mvSL(method.NNLS()), ...)
+            .parallel = parallel, method = method.mvSL(method.NNLS()))  #, ...)
         
         
     }

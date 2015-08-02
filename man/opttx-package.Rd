@@ -28,10 +28,7 @@ Qbar0 <- function(A, W) {
     W2 <- W[, 2]
     W3 <- W[, 3]
     W4 <- W[, 4]
-    Qbar <- plogis(ifelse(W4 > 0, (A == 1) + (A == 1) * (5 * W1^2 - 4.45), (A == 
-        2) + (A == 3) + (A == 2) * (4 * W2) + (A == 3) * (5 * W3)))
-    # Qbar <- plogis((A == 1) * (1 + 5 * W1^2 - 4.45) + (A == 2) * (-1 + 4 * W2) + (1
-    # + 5 * W3) + 5 * W3 * sin(W4))
+    Qbar <- plogis(1 * (A == 1) + 3 * (((A == 2) - (A == 3)) * (W1)) + W2 * sin(W3))
     return(Qbar)
 }
 
@@ -67,19 +64,25 @@ gen_data <- function(n = 1000, p = 4) {
     data.frame(W, A, Y, Q0aW, d0, Yd0)
 }
 
+
+
 testdata <- gen_data(1e+05, 5)
 
 
-opt_tmle.SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.step.forward", 
+
+SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.step.forward", 
     "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), g = c("mnSL.randomForest", 
     "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"), QaV = c("SL.glm", "SL.glmnetprob", 
     "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c("mnSL.randomForest", 
     "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"))
 
+SL.library$QaV <- sl_to_mv_library(SL.library$QaV)
+
+
+data <- gen_data(1000, 5)
 
 nodes <- list(Wnodes = Wnodes, Anode = Anode, Ynode = "Ystar", Vnodes = Vnodes)
-data <- gen_data(1000, 5)
-result <- opt_tmle(data, SL.library = opt_tmle.SL.library)
+result <- opt_tmle(data, SL.library = SL.library)
 print(result)
 Wnodes <- result$nodes$Wnodes
 QaV_dV <- predict(result, newdata = testdata[, Wnodes], pred_fit = "QaV")

@@ -152,7 +152,7 @@ sub_rule <- function(opt_obj, V) {
     diff_dV <- full$dV - reduced$dV
     diff_EYd <- with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], 
         val_preds$pA, val_preds$QaW, full$dV, reduced$dV))
-    
+    # do this for the estimates after TMLE!
     ggplot(long, aes(x = val, y = value, color = variable)) + facet_wrap(~node) + 
         geom_smooth(method = "loess") + geom_rug(alpha = 0.2, sides = "b")
 }

@@ -1,34 +1,5 @@
 
-#' @export
-create_tmle_risk <- function(Z, data, nodes, predictions) {
-    A <- data[, nodes$Anode]
-    Y <- data[, nodes$Ynode]
-    
-    A_vals <- vals_from_factor(A)
-    pA <- predictions$pA
-    QaW <- predictions$QaW
-    
-    tmle_alpha <- function(alpha) {
-        alpha <- normalize(alpha)
-        dV <- A_vals[dV_from_preds(mn_pred(alpha, Z))]
-        
-        -1 * rule_tmle(A, Y, pA, QaW, dV)$est
-    }
-}
 
-create_dripcw_risk <- function(Z, data, nodes, predictions) {
-    
-    A_vals <- vals_from_factor(A)
-    nA <- length(A_vals)
-    DR <- predictions$DR
-    
-    dripcw_alpha <- function(alpha) {
-        alpha <- normalize(alpha)
-        dV <- A_vals[dV_from_preds(mn_pred(alpha, Z))]
-        
-        -1 * nA * mean(factor_to_indicators(dV) * val_preds$DR)
-    }
-}
 create_predmat <- function(QaV_fit, class_fit, newdata = "cv-original") {
     QaV_Z <- NULL
     QaV_coef <- c()
