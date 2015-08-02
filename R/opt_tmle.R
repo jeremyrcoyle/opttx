@@ -64,14 +64,13 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
         .parallel = parallel, method = method.NNloglik(), control = list(trimLogit = 1e-05))
     Q_fit <- split_from_args(Q_fit_args)
     # Q_fit_full <- split_to_full(Q_fit) Q_fit_nested <-
-    # split_to_nested(Q_fit,Q_fit_args)
-    #Q_fit <- drop_zero_learners(Q_fit)
+    # split_to_nested(Q_fit,Q_fit_args) Q_fit <- drop_zero_learners(Q_fit)
     
     message_verbose("Fitting g", 1, verbose)
     g_fit_args <- list(folds = folds, Y = data[, nodes$Anode], X = data[, nodes$Wnodes], 
         SL.library = SL.library$g, family = list(family = "multinomial"), method = method.mnNNloglik())
     g_fit <- split_from_args(g_fit_args)
-    #g_fit <- drop_zero_learners(g_fit)
+    # g_fit <- drop_zero_learners(g_fit)
     fits <- list(Q_fit = Q_fit, g_fit = g_fit)
     
     # fit rule
@@ -85,13 +84,13 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     full_preds <- opttx_split_preds(folds[[1]], data, nodes, fits, use_full = T)
     val_preds <- extract_vals(folds, split_preds)
     
-    split_folds=make_folds(strata_ids=val_preds$v)
+    split_folds <- make_folds(strata_ids = val_preds$v)
     
-    split_preds2 <- cross_validate(opttx_split_preds, split_folds, data, nodes, fits, .combine = F, 
-        .parallel = parallel)
+    split_preds2 <- cross_validate(opttx_split_preds, split_folds, data, nodes, fits, 
+        .combine = F, .parallel = parallel)
     val_preds2 <- extract_vals(split_folds, split_preds2)
     
-    table(val_preds$v,val_preds2$v)
+    table(val_preds$v, val_preds2$v)
     
     # fits$rule_fit <- learn_rule(data, folds, nodes, split_preds, full_preds,
     # val_preds, parallel = F, SL.library = SL.library, verbose) #, ...)
@@ -103,11 +102,11 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     QaV_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, nodes$Vnodes, 
         drop = F], split_preds = split_preds, full_preds = full_preds, SL.library = SL.library$QaV, 
         family = gaussian(), cvfun = QaV_cv_SL, .parallel = parallel, method = method)
-
+    
     QaV_fit2 <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, nodes$Vnodes, 
         drop = F], split_preds = split_preds, full_preds = full_preds, SL.library = SL.library$QaV, 
         family = gaussian(), cvfun = QaV_cv_SL, .parallel = parallel, method = method.mvSL(method.NNLS()))
-
+    
     # estimate performance cv_dV <- predict(fits$rule_fit, newdata = 'cv-original',
     # pred_fit = 'joint')
     cv_dV <- max.col(predict(QaV_fit, newdata = "cv-original")$pred)
@@ -116,29 +115,32 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     
     newQaV <- cross_validate(refit_split, split_folds, QaV_fit)
     QaV_split <- index_dim(newQaV$preds, order(newQaV$index))
-    split_fold=split_folds[[1]]
-    test=function(split_fold,folds){
-        newQ <- refit_split(split_fold,fits$Q_fit, control = fits$Q_fit$fullFit$control)$fit[[1]]
-        newg <- refit_split(split_fold,fits$g_fit, control = fits$g_fit$fullFit$control)$fit[[1]]
-        new_fits=list(Q_fit=newQ,g_fit=newg)
-        valid_data=validation(data)
-        fold=folds[[1]]
-        split_preds2 <- cross_validate(opttx_split_preds, folds, data, nodes, new_fits, .combine = F, 
-        .parallel = parallel)
+    split_fold <- split_folds[[1]]
+    test <- function(split_fold, folds) {
+        newQ <- refit_split(split_fold, fits$Q_fit, control = fits$Q_fit$fullFit$control)$fit[[1]]
+        newg <- refit_split(split_fold, fits$g_fit, control = fits$g_fit$fullFit$control)$fit[[1]]
+        new_fits <- list(Q_fit = newQ, g_fit = newg)
+        valid_data <- validation(data)
+        fold <- folds[[1]]
+        split_preds2 <- cross_validate(opttx_split_preds, folds, data, nodes, new_fits, 
+            .combine = F, .parallel = parallel)
         
-        QaV_fit2 <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, nodes$Vnodes, 
-        drop = F], split_preds = split_preds2, full_preds = full_preds, SL.library = SL.library$QaV, 
-        family = gaussian(), cvfun = QaV_cv_SL, .parallel = parallel, method = method)
+        QaV_fit2 <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, 
+            nodes$Vnodes, drop = F], split_preds = split_preds2, full_preds = full_preds, 
+            SL.library = SL.library$QaV, family = gaussian(), cvfun = QaV_cv_SL, 
+            .parallel = parallel, method = method)
         
-        #refit_weights
+        # refit_weights
         
-        train_preds=lapply(split_preds2,function(x){lapply(x,training,fold=split_fold)})
+        train_preds <- lapply(split_preds2, function(x) {
+            lapply(x, training, fold = split_fold)
+        })
         str(train_preds)
-        method2=method.EYd(train_preds)
-        QaV_fit$fullFit$method=method2
+        method2 <- method.EYd(train_preds)
+        QaV_fit$fullFit$method <- method2
         newQaV <- refit_split(split_fold, QaV_fit, control = fits$Q_fit$fullFit$control)
         str(split_preds2)
-        validation(fold=split_fold)%in%validation(fold=folds[[2]])
+        validation(fold = split_fold) %in% validation(fold = folds[[2]])
     }
     newg <- cross_validate(refit_split, split_folds, fits$g_fit, control = fits$g_fit$fullFit$control)
     g_split <- index_dim(newg$preds, order(newg$index))
@@ -153,7 +155,7 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     test_dV2 <- max.col(predict(QaV_fit2, newdata = testdata[, Wnodes])$pred)
     mean(Qbar0(test_dV2, testdata[, Wnodes]))
     
-    table(eyd=test_dV==testdata$d0, nnls=test_dV2==testdata$d0)
+    table(eyd = test_dV == testdata$d0, nnls = test_dV2 == testdata$d0)
     
     mean(Qbar0(testdata$d0, testdata[, Wnodes]))
     rule_tmle(data$A, data$Y, val_preds$pA, val_preds$QaW, cv_dV)

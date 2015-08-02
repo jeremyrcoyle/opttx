@@ -30,7 +30,7 @@ opttx_split_preds <- function(fold, data, nodes, fits, use_full = F, ...) {
     
     Z <- max.col(DR)
     
-    list(QaW = QaW, pA = pA, DR = DR, Z = Z, Y=Y, A=A, v=rep(v,length(Y)))
+    list(QaW = QaW, pA = pA, DR = DR, Z = Z, Y = Y, A = A, v = rep(v, length(Y)))
 }
 
 
@@ -56,7 +56,7 @@ extract_vals <- function(folds, split_preds, parallel = F) {
     
     lapply(val_preds, index_dim, data_order)
     
-} 
+}
 # todo: reintroduce binary versions of these based on blips
 QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, 
     full_preds, blip_type = "DR", use_full = F, ...) {
@@ -102,4 +102,4 @@ class_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_pr
     
     cv_SL(fold, Z, X, SL.library, family, obsWeights, id)
 }
-
+ 

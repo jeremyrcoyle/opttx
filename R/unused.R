@@ -125,7 +125,7 @@ method.EYd <- function(nuisance_preds) {
             EYd_alpha(alpha)
         })
         
-        names(cvRisk) <-libraryNames
+        names(cvRisk) <- libraryNames
         
         starts <- simplex.sample(num_alg, 30)$samples
         start_risk <- apply(starts, 1, EYd_alpha)
@@ -138,12 +138,12 @@ method.EYd <- function(nuisance_preds) {
         
         coef <- normalize(fit$solution)
         
-        names(coef) <-libraryNames
+        names(coef) <- libraryNames
         
         out <- list(cvRisk = cvRisk, coef = coef)
         return(out)
     }, computePred = function(predY, coef, ...) {
-        out <- mn_pred(coef,predY)
+        out <- mn_pred(coef, predY)
         return(out)
     })
     invisible(out)
@@ -251,16 +251,16 @@ refit_split <- function(fold, fit, ...) {
     valid_Z <- index_dim(Z, validation())
     
     
-    coef <- fit$fullFit$method$computeCoef(train_Z, train_Y, names(fit$cvRisk), 
-        T, obsWeights = train_weights, ...)$coef
+    coef <- fit$fullFit$method$computeCoef(train_Z, train_Y, names(fit$cvRisk), T, 
+        obsWeights = train_weights, ...)$coef
     
-    fit$coef=coef
-    fit$fullFit$coef=coef
-    for(i in 1:length(fit$foldFits)){
-        fit$foldFits[[i]]$coef=coef
+    fit$coef <- coef
+    fit$fullFit$coef <- coef
+    for (i in 1:length(fit$foldFits)) {
+        fit$foldFits[[i]]$coef <- coef
     }
     
-    return(list(fit=list(fit)))
+    return(list(fit = list(fit)))
 }
 
 marginalize_V <- function() {
