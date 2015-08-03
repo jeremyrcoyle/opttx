@@ -90,20 +90,7 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
         .combine = F, .parallel = parallel)
     val_preds2 <- extract_vals(split_folds, split_preds2)
     
-    table(val_preds$v, val_preds2$v)
-    
-    # fits$rule_fit <- learn_rule(data, folds, nodes, split_preds, full_preds,
-    # val_preds, parallel = F, SL.library = SL.library, verbose) #, ...)
-    nuisance_preds <- val_preds
-    nuisance_preds$A <- data[, Anode]
-    nuisance_preds$Y <- data[, Ynode]
-    
-    method <- method.EYd(nuisance_preds)
     QaV_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, nodes$Vnodes, 
-        drop = F], split_preds = split_preds, full_preds = full_preds, SL.library = SL.library$QaV, 
-        family = gaussian(), cvfun = QaV_cv_SL, .parallel = parallel, method = method)
-    
-    QaV_fit2 <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, nodes$Vnodes, 
         drop = F], split_preds = split_preds, full_preds = full_preds, SL.library = SL.library$QaV, 
         family = gaussian(), cvfun = QaV_cv_SL, .parallel = parallel, method = method.mvSL(method.NNLS()))
     
@@ -113,7 +100,10 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     
     split_folds <- make_folds(data, V = 10)
     
-    newQaV <- cross_validate(refit_split, split_folds, QaV_fit)
+    refit_QaV <- cross_validate(refit_split, split_folds, QaV_fit)
+    refit_preds<-index_dim(refit_QaV$pred,order(refit_QaV$valid_index))
+    refit_dV<-dV_from_preds(refit_preds)
+    table(cv_dV,refit_dV)
     QaV_split <- index_dim(newQaV$preds, order(newQaV$index))
     split_fold <- split_folds[[1]]
     test <- function(split_fold, folds) {

@@ -247,12 +247,15 @@ refit_split <- function(fold, fit, ...) {
     train_Y <- training(Y)
     train_weights <- training(weights)
     
+    valid_index=validation()
     valid_Y <- validation(fit$valY)
-    valid_Z <- index_dim(Z, validation())
+    valid_Z <- index_dim(Z, valid_index)
     
     
     coef <- fit$fullFit$method$computeCoef(train_Z, train_Y, names(fit$cvRisk), T, 
         obsWeights = train_weights, ...)$coef
+    
+    pred=fit$fullFit$method$computePred(valid_Z,coef)
     
     fit$coef <- coef
     fit$fullFit$coef <- coef
@@ -260,7 +263,7 @@ refit_split <- function(fold, fit, ...) {
         fit$foldFits[[i]]$coef <- coef
     }
     
-    return(list(fit = list(fit)))
+    return(list(fit = list(fit),pred=pred,valid_index=valid_index))
 }
 
 marginalize_V <- function() {

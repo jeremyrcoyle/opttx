@@ -1,5 +1,6 @@
 
 # split specific predictions for Q and g and derived quantities
+#' export
 opttx_split_preds <- function(fold, data, nodes, fits, use_full = F, ...) {
     v <- fold_index()
     train_idx <- training()

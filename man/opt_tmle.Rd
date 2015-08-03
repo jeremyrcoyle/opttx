@@ -44,6 +44,7 @@ To avoid nesting cross-validation, it uses split-specfic estimates of Q and g to
 'split-specific' estimates of the rule in CV-TMLE to estimate mean performance
 }
 \examples{
+
 Qbar0 <- function(A, W) {
     
     W1 <- W[, 1]
@@ -92,10 +93,10 @@ testdata <- gen_data(1e+05, 5)
 
 
 
-SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.step.forward", 
-    "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), g = c("mnSL.randomForest", 
-    "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"), QaV = c("SL.glm", "SL.glmnetprob", 
-    "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c("mnSL.randomForest", 
+SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnet", "SL.step.forward", "SL.gam", 
+    "SL.rpart", "SL.rpartPrune", "SL.mean"), g = c("mnSL.randomForest", "mnSL.glmnet", 
+    "mnSL.multinom", "mnSL.mean"), QaV = c("SL.glm", "SL.glmnet", "SL.step.forward", 
+    "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c("mnSL.randomForest", 
     "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"))
 
 SL.library$QaV <- sl_to_mv_library(SL.library$QaV)

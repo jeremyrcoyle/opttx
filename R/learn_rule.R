@@ -1,9 +1,13 @@
 
 #' @export        
 dV_from_preds <- function(preds) {
-    max.col(preds)
+    max.col(preds,ties.method="first")
 }
 
+#' @export
+assign_treatment <- function(fit,newdata){
+    dV_from_preds(predict(fit,newdata)$pred)
+}
 # fit Q on A and subset of covariates V
 learn_rule <- function(data, folds, nodes, split_preds, full_preds, predictions, 
     parallel = F, SL.library, verbose, ...) {
