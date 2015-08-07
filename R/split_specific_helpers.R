@@ -19,9 +19,9 @@ opttx_split_preds <- function(fold, data, nodes, fits, use_full = F, ...) {
     # split specific estimates
     A_vals <- vals_from_factor(data[, nodes$Anode])
     QaW <- pred_all_Q(splitQ_fit, data[, c(nodes$Anode, nodes$Wnodes)], A_vals, nodes$Anode)
-    
+    newdata <- data[, c(nodes$Anode, nodes$Wnodes)]
     pA <- predict(splitg_fit, data[, nodes$Wnodes])$pred
-    
+    pA[pA < 0.05] <- 0.05
     # split specific blip, class, and weights
     A <- data[, nodes$Anode]
     Y <- data[, nodes$Ynode]
@@ -32,6 +32,26 @@ opttx_split_preds <- function(fold, data, nodes, fits, use_full = F, ...) {
     Z <- max.col(DR)
     
     list(QaW = QaW, pA = pA, DR = DR, Z = Z, Y = Y, A = A, v = rep(v, length(Y)))
+}
+
+opttx_refit_split_preds <- function(fold, data, nodes, fits, use_full = F, ...) {
+    v <- fold_index()
+    train_idx <- training()
+    valid_idx <- validation()
+    
+    if ((all.equal(train_idx, valid_idx) == T) || use_full) {
+        # we're in final resubstitution call, so let's use full Q and g fits
+        splitrule_fit <- fits$rule_fit$fullFit
+    } else {
+        # split specific Super Learners
+        splitrule_fit <- fits$rule_fit$foldFits[[v]]
+    }
+    
+    # split specific estimates
+    DR <- predict(splitrule_fit, newdata = (data[, nodes$Vnodes]))$pred
+    Z <- max.col(DR)
+    
+    list(DR = DR, Z = Z, v = rep(v, length(Z)))
 }
 
 
@@ -83,7 +103,7 @@ QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_pred
         to_predict <- DR
     }
     
-    cv_SL(fold, to_predict, X, SL.library, family, obsWeights, id)
+    cv_SL(fold, to_predict, X, SL.library, family, obsWeights, id, ...)
 }
 #' @export
 class_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, 

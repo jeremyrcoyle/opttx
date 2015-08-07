@@ -3,6 +3,7 @@
 # TMLE for a rule works by redefining A=1 as 'followed rule' and A=0 as 'didn't
 # follow rule' pA is updated accordingly todo: move to gentmle
 fit_rule_tmle <- function(obsA, obsY, pA, QaW, dV) {
+    # dV <- factor(levels(obsA)[dV], levels(obsA))
     Ad <- as.numeric(obsA == dV)
     dV_ind <- factor_to_indicators(dV)
     pAd <- rowSums(pA * dV_ind)
@@ -15,10 +16,10 @@ rule_dripcw <- function(DR, dV) {
     dV_ind <- factor_to_indicators(dV)
     DR_dV <- rowSums(DR * dV_ind)
     est <- mean(DR_dV)
-    sd <- sd(DR_dV)/sqrt(length(DR_dV))
-    lower <- est - qnorm(0.975) * sd
-    upper <- est + qnorm(0.975) * sd
-    data.frame(est = est, sd = sd, lower = lower, upper = upper)
+    se <- sd(DR_dV)/sqrt(length(DR_dV))
+    lower <- est - qnorm(0.975) * se
+    upper <- est + qnorm(0.975) * se
+    data.frame(est = est, se = se, lower = lower, upper = upper)
 }
 
 rule_tmle <- function(obsA, obsY, pA, QaW, dV) {
@@ -27,6 +28,14 @@ rule_tmle <- function(obsA, obsY, pA, QaW, dV) {
     ci$parameter <- NULL
     
     return(ci)
+}
+
+EY <- function(obsA, obsY, pA, QaW, dV) {
+    est <- mean(obsY)
+    se <- sd(obsY)/sqrt(length(obsY))
+    lower <- est - qnorm(0.975) * se
+    upper <- est + qnorm(0.975) * se
+    data.frame(est = est, se = se, lower = lower, upper = upper)
 }
 
 # difference of two TMLEs using the delta method note that this may not work
@@ -58,9 +67,9 @@ estimate_performance <- function(data, nodes, predictions, dV, perf_tmle = TRUE,
         
         est_A <- rule_tmle(A, Y, predictions$pA, predictions$QaW, A)
         est_opt <- rule_tmle(A, Y, predictions$pA, predictions$QaW, dV)
-        
-        ests <- rbind(static_ests, est_A, est_opt)
-        rules <- c(sprintf("A=%s", A_vals), "A=a_obs", "A=d(V)")
+        est_EY <- EY(A, Y, predictions$pA, predictions$QaW, A)
+        ests <- rbind(static_ests, est_A, est_opt, est_EY)
+        rules <- c(sprintf("A=%s", A_vals), "A=a_obs", "A=d(V)", "EY")
         ests$rule <- rules
         ests$estimator <- "TMLE"
         tmle_ests <- ests

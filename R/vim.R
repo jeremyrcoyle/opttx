@@ -1,218 +1,325 @@
-risk_from_osl <- function(osl_fit) {
-    function(pred, Y) {
-        method <- osl_fit$fullFit$method
-        coef <- method$computeCoef(pred, Y, libraryNames = "split_SL", obsWeights = osl_fit$valWeights, 
-            verbose = F)
-        risk <- coef$cvRisk
-    }
+
+wald <- function(x) {
+    est <- mean(x)
+    se <- sd(x)/sqrt(length(x))
+    lower <- est - qnorm(0.975) * se
+    upper <- est + qnorm(0.975) * se
+    c(est = est, se = se, lower = lower, upper = upper)
 }
 
+get_cv_preds <- function(fit) {
+    predict(fit, newdata = "cv-original")$pred
+}
 
-#' @export
-#'
-SL_vim <- function(osl_fit, data, Xnodes, ...) {
-    full_preds <- cv_predict_original(osl_fit)
-    risk_fun <- risk_from_osl(osl_fit)
-    Y <- osl_fit$valY
-    full_risk <- risk_fun(full_preds, Y)
-    full_coefs <- osl_fit$coef
-    which_nz <- which(full_coefs != 0)
-    nz_coefs <- full_coefs[which_nz]
-    nz_library <- osl_fit$SL.library[which_nz]
+EYd <- function(fit_dV, opt_obj) {
+    with(opt_obj, rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], val_preds$pA, 
+        val_preds$QaW, fit_dV))
+}
+
+EYd_comp <- function(reduced_dV, full_dV, opt_obj) {
+    with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], val_preds$pA, 
+        val_preds$QaW, full_dV, reduced_dV))
+}
+
+risk_01 <- function(x, y) {
+    wald(x != y)
+}
+
+risk_mse <- function(x, y) {
+    wald((x - y)^2)
+}
+
+get_test_preds <- function(fit, testdata) {
+    predict(fit, newdata = testdata[, fit$Vnodes])$pred
+}
+
+test_EYd <- function(dV, testdata, Qbar0) {
+    mean(Qbar0(dV, testdata))
+}
+
+backward_vim <- function(opt_obj, testdata = NULL, Qbar0 = NULL) {
+    # opt_obj <- result
+    full_fit <- opt_obj$fits$rule_fit
     
-    riskdf <- ldply(seq_along(Xnodes), .progress = "text", function(idx, ...) {
-        new_Xnodes <- Xnodes[-1 * idx]
-        new_fit <- origami_SuperLearner(Y = as.vector(full_preds), X = data[, new_Xnodes], 
-            folds = osl_fit$folds, family = "gaussian", SL.library = nz_library, 
-            method = method.probloglik)
+    # fit rules on all subsets V_i\V
+    Vnodes <- opt_obj$nodes$Vnodes
+    full_fit$Vnodes <- Vnodes
+    rule_args <- opt_obj$rule_args
+    
+    reduced_fits <- lapply(Vnodes, function(drop_Vnode) {
+        cat(sprintf("Vnode %s\n", drop_Vnode))
+        newV <- setdiff(Vnodes, drop_Vnode)
+        rule_args$X <- opt_obj$data[, newV, drop = F]
+        reduced_fit <- split_from_args(rule_args)
+        reduced_fit$Vnodes <- newV
         
-        new_preds <- new_fit$Z %*% nz_coefs  #cv_predict_original(new_fit)
-        risk_from_full <- risk_fun(new_preds, full_preds)
-        p_disagree <- mean((full_preds > 0.5) != (new_preds > 0.5))
-        data.frame(node = Xnodes[idx], p_disagree = p_disagree, risk_from_full = risk_from_full)
+        reduced_fit
     })
     
-    no_fit <- origami_SuperLearner(Y = as.vector(full_preds), X = data[, Xnodes], 
-        folds = osl_fit$folds, family = osl_fit$fullFit$family, SL.library = "SL.mean", 
-        ...)
-    no_pred <- cv_predict_original(no_fit)
-    no_p_disagree <- mean((full_preds > 0.5) != (no_pred > 0.5))
-    no_info_full <- risk_fun(no_pred, full_preds)
-    no_info <- data.frame(node = "empty", p_disagree = no_p_disagree, risk_from_full = no_info_full)
-    riskdf <- rbind(riskdf, no_info)
-    riskdf$risk_fraction <- (riskdf$risk_from_full)/no_info_full
-    riskdf$p_disagree_fraction <- riskdf$p_disagree/no_p_disagree
+    A_vals <- vals_from_factor(opt_obj$val_preds$A)
     
     
-    return(riskdf)
+    full_preds <- get_cv_preds(full_fit)
+    reduced_preds <- lapply(reduced_fits, get_cv_preds)
+    
+    reduced_mse <- ldply(reduced_preds, risk_mse, full_preds)
+    reduced_mse$Vnode <- Vnodes
+    reduced_mse$metric <- "regression mse"
+    
+    full_dV <- dV_from_preds(full_preds, A_vals)
+    reduced_dV <- lapply(reduced_preds, dV_from_preds, A_vals)
+    
+    reduced_01 <- ldply(reduced_dV, risk_01, full_dV)
+    reduced_01$Vnode <- Vnodes
+    reduced_01$metric <- "rule disagreement"
+    
+    # full_EYd <- EYd(full_dV, opt_obj) reduced_EYd <- ldply(reduced_dV, EYd,
+    # opt_obj)
+    reduced_EYd_comp <- ldply(reduced_dV, EYd_comp, full_dV, opt_obj)
+    reduced_EYd_comp$Vnode <- Vnodes
+    reduced_EYd_comp$metric <- "value difference"
+    
+    vimdf <- rbind.fill(reduced_mse, reduced_01, reduced_EYd_comp)
+    
+    Vnode_order <- reduced_mse$Vnode[order(reduced_mse$est)]
+    vimdf$Vnode <- factor(vimdf$Vnode, levels = Vnode_order)
+    
+    # pdf('vim.pdf', height = 4, width = 6)
+    ggplot(vimdf, aes(y = Vnode, x = est, xmin = lower, xmax = upper)) + geom_point() + 
+        geom_errorbarh() + facet_wrap(~metric, scales = "free") + theme_bw()
+    # dev.off()
+    
+    
+    if (!is.null(testdata)) {
+        full_test_preds <- get_test_preds(full_fit, testdata)
+        reduced_test_preds <- lapply(reduced_fits, get_test_preds, testdata)
+        
+        reduced_test_mse <- ldply(reduced_test_preds, risk_mse, full_test_preds)
+        test_mse_df <- data.frame(test = reduced_test_mse$est, Vnode = Vnodes, metric = "regression mse")
+        
+        full_test_dV <- dV_from_preds(full_test_preds)
+        reduced_test_dV <- lapply(reduced_test_preds, dV_from_preds)
+        
+        reduced_test_01 <- ldply(reduced_test_dV, risk_01, full_test_dV)
+        test_01_df <- data.frame(test = reduced_test_01$est, Vnode = Vnodes, metric = "rule disagreement")
+        
+        full_test_EYd <- test_EYd(full_test_dV, testdata, Qbar0)
+        reduced_test_EYd <- sapply(reduced_test_dV, test_EYd, testdata, Qbar0)
+        
+        reduced_test_EYd_comp <- full_test_EYd - reduced_test_EYd
+        
+        test_EYd_comp_df <- data.frame(test = reduced_test_EYd_comp, Vnode = Vnodes, 
+            metric = "value difference")
+        
+        testdf <- rbind(test_mse_df, test_01_df, test_EYd_comp_df)
+        
+        vimdf <- merge(vimdf, testdf)
+        vimdf$covered <- vimdf$lower < vimdf$test & vimdf$test < vimdf$upper
+    }
+    
+    vimresult <- list(full_preds = full_preds, reduced_preds = reduced_preds, vimdf = vimdf)
+    
+    return(vimresult)
 }
 
-SL_vimtest <- function(osl_fit, data, Xnodes, ...) {
-    full_preds <- cv_predict_original(osl_fit)
-    Y <- osl_fit$valY
-    new_fit <- origami_SuperLearner(Y = Y, X = data[, Xnodes], folds = osl_fit$folds, 
-        family = osl_fit$fullFit$family, SL.library = osl_fit$SL.library, method = osl_fit$fullFit$method, 
-        ...)
-    new_preds <- cv_predict_original(new_fit)
-    plot(full_preds, new_preds)
-    browser()
-    
-}
 
-#' @export
-#'
-tx_vim <- function(opt_obj, verbose = 2) {
+vis_preds <- function() {
     
-    message_verbose("VIM for g", 1, verbose)
-    obs <- with(opt_obj, SL_vim(fits$g_fit, data, nodes$Wnodes, cts.num = 5))
-    obs$model <- "Observed"
+    list(preds = preds, dV = dV, EYd = EYd)
     
-    message_verbose("VIM for rule", 1, verbose)
-    opt <- with(opt_obj, SL_vim(fits$blip_fit, data, nodes$Vnodes, split_preds = split_preds, 
-        cvfun = split_cv_SL, cts.num = 10, blip_type = blip_type, maximize = maximize))
-    opt$model <- "Optimal"
+    compare_preds <- function(full, reduced, Vdata) {
+        all_diffs <- ldply(1:length(Vnodes), function(index) {
+            diffs <- as.data.frame(full - reduced[[index]])
+            diffs$Vnode <- Vnodes[index]
+            diffs$V <- Vdata[, Vnodes[index]]
+            diffs
+        })
+        long <- melt(all_diffs, id = c("Vnode", "V"))
+    }
     
-    vims <- rbind(obs, opt)
+    diff_preds <- compare_preds(full_preds, reduced_preds, opt_obj$data)
+    # diff_preds <- compare_preds(factor_to_indicators(full_dV),
+    # lapply(reduced_dV,factor_to_indicators), opt_obj$data)
+    diff_preds$variable <- levels(opt_obj$val_preds$A)[diff_preds$variable]
+    # testdiff_preds <- compare_preds(full_test_preds, reduced_test_preds, testdata)
+    goodnodes <- tail(levels(reducedlong$Vnode), 100)
+    ct.num <- sapply(opt_obj$data[, Vnodes], function(x) length(unique(x)))
+    diff_preds <- diff_preds[(diff_preds$Vnode %in% goodnodes), ]
+    V_facts <- Vnodes[which(ct.num < 5)]
+    diff_conts <- diff_preds[!(diff_preds$Vnode %in% V_facts), ]
+    test <- ddply(diff_conts, .(Vnode), function(nodedata) {
+        quants <- quantile(nodedata$V, c(0.025, 0.975))
+        print(nodedata$Vnode[1])
+        print(quants)
+        nodedata[quants[1] < nodedata$V & nodedata$V < quants[2], ]
+    })
     
-    return(vims)
+    dim(diff_conts)
+    pdf("vim_cont.pdf", height = 6, width = 8)
+    ggplot(test, aes(x = V)) + facet_wrap(~Vnode, scales = "free") + geom_smooth(aes(y = value, 
+        color = variable, group = variable), method = "loess") + geom_rug(data = test[test$variable == 
+        test$variable[1], ], color = "black", alpha = 0.8, sides = "b") + theme_bw() + 
+        coord_cartesian(ylim = c(-0.01, 0.01))
+    dev.off()
+    diff_facts <- diff_preds[diff_preds$Vnode %in% V_facts, ]
+    ggplot(diff_facts, aes(x = factor(V))) + facet_wrap(~Vnode, scales = "free") + 
+        geom_boxplot(aes(y = value, fill = variable), position = "dodge") + theme_bw() + 
+        coord_cartesian(ylim = range(diff_facts$value))
+    aggregate(value ~ Vnode, diff_preds, var)
+    aggregate(value ~ Vnode, testdiff_preds, var)
+    diff_dV <- full$dV - reduced$dV
+    diff_EYd <- with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], 
+        val_preds$pA, val_preds$QaW, full$dV, reduced$dV))
 }
-
-sub_rule <- function(opt_obj, V) {
+# todo: be clever about categorical V
+forward_vim <- function(opt_obj, V) {
     opt_obj <- result
     full_fit <- opt_obj$fits$rule_fit
     
     # fit rules on all subsets V_i\V
-    newnodes <- opt_obj$nodes
-    Vnodes <- newnodes$Vnodes
-    system.time({
-        reduced_fits <- lapply(Vnodes, function(drop_Vnode) {
-            newnodes$Vnodes <- setdiff(opt_obj$nodes$Vnodes, drop_Vnode)
-            reduced_fit <- with(opt_obj, learn_rule(data, folds, newnodes, split_preds, 
-                val_preds, parallel = F, SL.library = SL.library, verbose = 3))
-        })
-    })
-    testsamp <- data[, Vnodes]
-    testsamp[, -1] <- testsamp[1, -1]
+    Vnodes <- opt_obj$nodes$Vnodes
+    full_fit$Vnodes <- Vnodes
+    rule_args <- opt_obj$rule_args
+    A_vals <- vals_from_factor(opt_obj$val_preds$A)
     
-    system.time({
-        stupid <- merge(data[, 1, drop = F], data[, -1])
-        z <- get_test_preds(full_fit, stupid)
-    })
-    z
-    get_cv_preds <- function(fit) {
-        predict(fit, newdata = "cv-original", pred_fit = "joint", return_assignment = F)
-    }
-    preds_to_dV <- max.col
-    EYd <- function(dV) {
+    EYd <- function(fit_dV) {
         with(opt_obj, rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], val_preds$pA, 
-            val_preds$QaW, dV))
+            val_preds$QaW, fit_dV))
     }
     EYd_comp <- function(reduced_dV, full_dV) {
         with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], val_preds$pA, 
             val_preds$QaW, full_dV, reduced_dV))
     }
     
-    full_preds <- get_cv_preds(full_fit)
-    full_dV <- preds_to_dV(full_preds)
-    full_EYd <- EYd(dV)
+    
+    rule_args$Y <- full_preds
+    rule_split_preds <- opt_obj$split_preds
+    rule_split_preds$DR <- with(opt_obj, cross_validate(opttx_refit_split_preds, 
+        folds, data, nodes, fits, .combine = F))$DR
+    rule_full_preds <- opt_obj$full_preds
+    rule_full_preds$DR <- with(opt_obj, opttx_refit_split_preds(folds[[1]], data, 
+        nodes, fits, use_full = T))$DR
+    # rule_val_preds <- extract_vals(folds, rule_split_preds)
+    
+    rule_args$split_preds <- rule_split_preds
+    rule_args$full_preds <- rule_full_preds
+    rule_args$Y <- rule_full_preds$DR
+    rule_args$SL.library <- setdiff(rule_args$SL.library, "mvSL.glmnet")  #drop glmnets
+    # be smarter about how we combine rule_fit for different cats (right now it's a
+    # stupid average)
+    drop_Vnode <- Vnodes[[1]]
+    system.time({
+        reduced_fits <- lapply(Vnodes, function(drop_Vnode) {
+            
+            cat(sprintf("Vnode %s\n", drop_Vnode))
+            # newV <- setdiff(Vnodes, drop_Vnode)
+            
+            rule_args$X <- opt_obj$data[, drop_Vnode, drop = F]
+            reduced_fit <- split_from_args(rule_args)
+            reduced_fit$Vnodes <- drop_Vnode
+            
+            reduced_fit
+        })
+    })
+    
+    rule_args$X <- opt_obj$data[, Vnodes, drop = F]
+    
+    
+    A_vals <- vals_from_factor(opt_obj$val_preds$A)
+    null_preds <- predict(reduced_fits[[1]], newdata = "cv-original")$library[, , 
+        "mvSL.mean"]
+    null_dV <- dV_from_preds(null_preds, A_vals)
+    null_EYd <- EYd(null_dV)
+    
     
     reduced_preds <- lapply(reduced_fits, get_cv_preds)
-    reduced_dV <- lapply(reduced_preds, preds_to_dV)
-    reduced_EYd_comp <- ldply(reduced_dV, EYd_comp, full_dV)
-    n <- nrow(opt_obj$data)
-    reduced_loglik <- -1 * sapply(reduced_preds, origami:::mn_loglik, full_dV, rep(1, 
-        n))
-    risk_01 <- function(x, y) {
-        mean(x != y)
+    reduced_dV <- lapply(reduced_preds, dV_from_preds, A_vals)
+    reduced_EYd <- ldply(reduced_dV, EYd)
+    reduced_EYd_comp <- ldply(reduced_dV, function(reduced) EYd_comp(null_dV, reduced))
+    reduced_01 <- sapply(reduced_dV, risk_01, null_dV)
+    reduced_preds_diff <- lapply(reduced_preds, `-`, null_preds)
+    reduced_mse <- sapply(reduced_preds_diff, function(x) var(as.vector(x)))
+    
+    reduced_EYd_comp$Vnode <- Vnodes
+    reduced_EYd_comp$mse <- reduced_mse
+    reduced_EYd_comp$pdisagree <- reduced_01
+    reduced <- reduced_EYd_comp[order(reduced_EYd_comp$mse), ]
+    
+    get_test_preds <- function(fit, testdata) {
+        predict(fit, newdata = testdata[, fit$Vnodes])$pred
     }
-    reduced_01 <- sapply(reduced_dV, risk_01, full_dV)
-    reduced_dV_diff <- lapply(reduced_dV, `-`, full_dV)
-    get_test_preds <- function(fit, test_data) {
-        predict(fit, newdata = test_data[, fit$nodes$Vnodes], pred_fit = "joint", 
-            return_assignment = F)
-    }
+    
     test_EYd <- function(dV, testdata) {
-        mean(Qbar0(dV, testdata[, nodes$Wnodes]))
+        mean(Qbar0(dV, testdata))
     }
+    
     full_test_preds <- get_test_preds(full_fit, testdata)
-    full_test_dV <- preds_to_dV(full_test_preds)
+    full_test_dV <- dV_from_preds(full_test_preds)
     full_test_EYd <- test_EYd(full_test_dV, testdata)
     
     
     reduced_test_preds <- lapply(reduced_fits, get_test_preds, testdata)
-    reduced_test_dV <- lapply(reduced_test_preds, preds_to_dV)
+    reduced_test_dV <- lapply(reduced_test_preds, dV_from_preds)
     reduced_test_EYd <- sapply(reduced_test_dV, test_EYd, testdata)
+    reduced_EYd$test_est <- reduced_test_EYd
     reduced_test_EYd_comp <- full_test_EYd - reduced_test_EYd
     reduced_EYd_comp$test_est <- reduced_test_EYd_comp
     reduced_test_01 <- sapply(reduced_test_dV, risk_01, full_test_dV)
-    reduced_test_loglik <- -1 * sapply(reduced_test_preds, origami:::mn_loglik, full_test_dV, 
-        rep(1, nrow(testdata)))
+    reduced_test_preds_diff <- lapply(reduced_test_preds, `-`, full_test_preds)
+    reduced_test_mse <- sapply(reduced_test_preds_diff, function(x) var(as.vector(x)))
+    
+    plot(reduced_test_mse, reduced_mse)
     list(preds = preds, dV = dV, EYd = EYd)
-    diff_preds <- full$preds - reduced$preds
+    
+    
+    compare_preds <- function(full, reduced, Vdata) {
+        all_diffs <- ldply(1:length(Vnodes), function(index) {
+            # diffs <- as.data.frame(full - reduced[[index]])
+            diffs <- as.data.frame(reduced[[index]])
+            diffs$Vnode <- Vnodes[index]
+            diffs$V <- Vdata[, Vnodes[index]]
+            diffs
+        })
+        long <- melt(all_diffs, id = c("Vnode", "V"))
+    }
+    
+    plot_reduced_preds <- lapply(reduced_fits, function(x) predict(x, newdata = opt_obj$data)$pred)
+    plot_null_preds <- predict(reduced_fits[[1]], newdata = opt_obj$data)$library[, 
+        , 6]
+    diff_preds <- compare_preds(plot_null_preds, plot_reduced_preds, opt_obj$data)
+    # diff_preds <- compare_preds(factor_to_indicators(full_dV),
+    # lapply(reduced_dV,factor_to_indicators), opt_obj$data)
+    diff_preds$variable <- levels(opt_obj$val_preds$A)[diff_preds$variable]
+    # testdiff_preds <- compare_preds(full_test_preds, reduced_test_preds, testdata)
+    goodnodes <- tail(levels(reducedlong$Vnode), 100)
+    ct.num <- sapply(opt_obj$data[, Vnodes], function(x) length(unique(x)))
+    diff_preds <- diff_preds[(diff_preds$Vnode %in% goodnodes), ]
+    V_facts <- Vnodes[which(ct.num < 10)]
+    diff_conts <- diff_preds[!(diff_preds$Vnode %in% V_facts), ]
+    test <- ddply(diff_conts, .(Vnode), function(nodedata) {
+        quants <- quantile(nodedata$V, c(0.025, 0.975))
+        print(nodedata$Vnode[1])
+        print(quants)
+        nodedata[quants[1] < nodedata$V & nodedata$V < quants[2], ]
+    })
+    
+    dim(diff_conts)
+    pdf("vim_cont.pdf", height = 6, width = 8)
+    ggplot(test, aes(x = V)) + facet_wrap(~Vnode, scales = "free") + geom_line(aes(y = value, 
+        color = variable, group = variable)) + geom_rug(data = test[test$variable == 
+        test$variable[1], ], color = "black", alpha = 0.8, sides = "b") + theme_bw() + 
+        coord_cartesian(ylim = c(-0.1, 0.1))
+    dev.off()
+    diff_facts <- diff_preds[diff_preds$Vnode %in% V_facts, ]
+    ggplot(diff_facts, aes(x = factor(V))) + facet_wrap(~Vnode, scales = "free") + 
+        geom_point(aes(y = value, color = variable), position = "dodge") + theme_bw() + 
+        coord_cartesian(ylim = range(diff_facts$value))
+    aggregate(value ~ Vnode, diff_preds, var)
+    aggregate(value ~ Vnode, testdiff_preds, var)
     diff_dV <- full$dV - reduced$dV
     diff_EYd <- with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], 
         val_preds$pA, val_preds$QaW, full$dV, reduced$dV))
     # do this for the estimates after TMLE!
-    ggplot(long, aes(x = val, y = value, color = variable)) + facet_wrap(~node) + 
-        geom_smooth(method = "loess") + geom_rug(alpha = 0.2, sides = "b")
-}
-test <- function(opt_obj) {
-    newnodes <- opt_obj$nodes
-    Vnodes <- newnodes$Vnodes
-    drop_Vnode <- Vnodes[1]
-    cv_dV <- predict(rule_fit, newdata = "cv-original", pred_fit = "joint")
-    full_fit <- multinomial_SuperLearner(cv_dV, data[, Vnodes], folds = opt_obj$folds)
-    full_pred <- predict(full_fit, newdata = "cv-original")$pred
+    list(full_preds = full_preds, reudced_preds = reduced_preds, vimdf = vimdf)
     
-    dropdata2 <- ldply(Vnodes, function(drop_Vnode) {
-        newnodes$Vnodes <- setdiff(opt_obj$nodes$Vnodes, drop_Vnode)
-        red_fit <- multinomial_SuperLearner(cv_dV, data[, newnodes$Vnodes], folds = opt_obj$folds)
-        red_pred <- predict(red_fit, newdata = "cv-original")$pred
-        diffdf <- data.frame(diff = full_pred - red_pred, var = data[, drop_Vnode], 
-            name = drop_Vnode)
-        long <- melt(diffdf, id = c("var", "name"))
-    })
-    
-    
-    
-    ggplot(dropdata2, aes(x = var, y = value, color = variable)) + geom_point(alpha = 0.1) + 
-        geom_smooth(method = "loess") + facet_wrap(~name) + theme_bw()
-    test2 <- multinomial_SuperLearner(cv_dV, data[, Wnodes], folds = opt_obj$folds)
-}
-
-test <- function(opt_obj) {
-    
-    newnodes <- opt_obj$nodes
-    Vnodes <- newnodes$Vnodes
-    drop_Vnode <- Vnodes[1]
-    cv_dV <- predict(rule_fit, newdata = "cv-original", pred_fit = "joint")
-    full_fit <- multinomial_SuperLearner(cv_dV, data[, Vnodes], folds = opt_obj$folds)
-    full_fit <- opt_obj$fits$g_fit
-    
-    outcome <- full_fit$valY
-    
-    full_pred <- predict(full_fit, newdata = "cv-original")$pred
-    full_cat <- max.col(full_pred)
-    full_loglik <- mn_loglik(full_pred, factor_to_indicators(outcome), full_fit$valWeights)
-    
-    full_acc <- mean(full_cat == outcome)
-    reduced_fits <- lapply(Vnodes, function(drop_Vnode) {
-        newnodes$Vnodes <- setdiff(opt_obj$nodes$Vnodes, drop_Vnode)
-        red_fit <- multinomial_SuperLearner(outcome, data[, newnodes$Vnodes], folds = opt_obj$folds)
-    })
-    
-    
-    reduced_preds <- lapply(reduced_fits, function(fit) predict(fit, newdata = "cv-original")$pred)
-    reduced_cats <- sapply(reduced_preds, max.col)
-    reduced_acc <- apply(reduced_cats, 2, function(x) mean(x == outcome))
-    (full_acc - reduced_acc)/reduced_acc
-    
-    reduced_logliks <- sapply(reduced_preds, mn_loglik, factor_to_indicators(outcome), 
-        full_fit$valWeights)
-    lr <- 2 * (full_loglik - reduced_logliks)
-    pchisq(lr, 10)
-    red_fit$cvRisk
-    ggplot(dropdata3, aes(x = var, y = value, color = variable)) + geom_point(alpha = 0.1) + 
-        geom_smooth(method = "loess") + facet_wrap(~name) + theme_bw()
-    test2 <- multinomial_SuperLearner(cv_dV, data[, Wnodes], folds = opt_obj$folds)
 } 
