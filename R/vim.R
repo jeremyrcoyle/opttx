@@ -110,9 +110,11 @@ backward_vim <- function(opt_obj, testdata = NULL, Qbar0 = NULL) {
         
         full_test_dV <- dV_from_preds(full_test_preds, A_vals)
         reduced_test_dV <- lapply(reduced_test_preds, dV_from_preds, A_vals)
-        true_test_dV <- dV_from_preds(full_test_preds, A_vals)
+        true_test_dV <- dV_from_preds(true_test_preds, A_vals)
         
         reduced_test_01 <- ldply(reduced_test_dV, risk_diff_01, full_test_dV, true_test_dV)
+        ldply(reduced_test_dV, risk_01, true_test_dV)
+        risk_01(full_test_dV, true_test_dV)
         test_01_df <- data.frame(test = reduced_test_01$est, Vnode = Vnodes, metric = "rule disagreement")
         
         full_test_EYd <- test_EYd(full_test_dV, testdata, Qbar0)
