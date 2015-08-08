@@ -75,9 +75,10 @@ system.time({
 
 vimresult <- backward_vim(result, testdata, Qbar0)
 
-ggplot(vimresult$vimdf, aes(y = Vnode, x = est, xmin = lower, xmax = upper)) + geom_point() + geom_point(aes(x=test),color="red")+
-    geom_errorbarh() + facet_wrap(~metric, scales = "free") + theme_bw()
-    
+ggplot(vimresult$vimdf, aes(y = Vnode, x = est, xmin = lower, xmax = upper)) + geom_point() + 
+    geom_point(aes(x = test), color = "red") + geom_errorbarh() + facet_wrap(~metric, 
+    scales = "free") + theme_bw()
+
 print(result)
 plot(result)
 Wnodes <- result$nodes$Wnodes

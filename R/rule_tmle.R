@@ -46,10 +46,10 @@ two_rule_tmle <- function(obsA, obsY, pA, QaW, dV, dV2) {
     results2 <- fit_rule_tmle(obsA, obsY, pA, QaW, dV2)
     # combined results and put in a dataframe for ease of use
     est <- results$tmleests - results2$tmleests
-    sd <- sqrt(mean((results$Dstar[[1]] - results2$Dstar[[1]])^2))/sqrt(length(obsA))
-    lower <- est - qnorm(0.975) * sd
-    upper <- est + qnorm(0.975) * sd
-    data.frame(est = est, sd = sd, lower = lower, upper = upper)
+    se <- sqrt(mean((results$Dstar[[1]] - results2$Dstar[[1]])^2))/sqrt(length(obsA))
+    lower <- est - qnorm(0.975) * se
+    upper <- est + qnorm(0.975) * se
+    data.frame(est = est, se = se, lower = lower, upper = upper)
 }
 
 

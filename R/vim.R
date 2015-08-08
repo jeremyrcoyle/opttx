@@ -21,12 +21,20 @@ EYd_comp <- function(reduced_dV, full_dV, opt_obj) {
         val_preds$QaW, full_dV, reduced_dV))
 }
 
+risk_mse <- function(x, y) {
+    wald((x - y)^2)
+}
+
+risk_diff_mse <- function(reduced_x, full_x, y) {
+    wald((reduced_x - y)^2 - (full_x - y)^2)
+}
+
 risk_01 <- function(x, y) {
     wald(x != y)
 }
 
-risk_mse <- function(x, y) {
-    wald((x - y)^2)
+risk_diff_01 <- function(reduced_x, full_x, y) {
+    wald((reduced_x != y) - (full_x != y))
 }
 
 get_test_preds <- function(fit, testdata) {
@@ -61,15 +69,17 @@ backward_vim <- function(opt_obj, testdata = NULL, Qbar0 = NULL) {
     
     full_preds <- get_cv_preds(full_fit)
     reduced_preds <- lapply(reduced_fits, get_cv_preds)
+    true_preds <- full_fit$valY
     
-    reduced_mse <- ldply(reduced_preds, risk_mse, full_preds)
+    reduced_mse <- ldply(reduced_preds, risk_diff_mse, full_preds, true_preds)
     reduced_mse$Vnode <- Vnodes
     reduced_mse$metric <- "regression mse"
     
     full_dV <- dV_from_preds(full_preds, A_vals)
     reduced_dV <- lapply(reduced_preds, dV_from_preds, A_vals)
+    true_dV <- lapply(true_preds, dV_from_preds, A_vals)
     
-    reduced_01 <- ldply(reduced_dV, risk_01, full_dV)
+    reduced_01 <- ldply(reduced_dV, risk_diff_01, full_dV, true_dV)
     reduced_01$Vnode <- Vnodes
     reduced_01$metric <- "rule disagreement"
     
@@ -84,23 +94,25 @@ backward_vim <- function(opt_obj, testdata = NULL, Qbar0 = NULL) {
     Vnode_order <- reduced_mse$Vnode[order(reduced_mse$est)]
     vimdf$Vnode <- factor(vimdf$Vnode, levels = Vnode_order)
     
-    # pdf('vim.pdf', height = 4, width = 6)
-    ggplot(vimdf, aes(y = Vnode, x = est, xmin = lower, xmax = upper)) + geom_point() + 
-        geom_errorbarh() + facet_wrap(~metric, scales = "free") + theme_bw()
-    # dev.off()
+    # pdf('vim.pdf', height = 4, width = 6) ggplot(vimdf, aes(y = Vnode, x = est,
+    # xmin = lower, xmax = upper)) + geom_point() + geom_errorbarh() +
+    # facet_wrap(~metric, scales = 'free') + theme_bw() dev.off()
     
     
     if (!is.null(testdata)) {
         full_test_preds <- get_test_preds(full_fit, testdata)
         reduced_test_preds <- lapply(reduced_fits, get_test_preds, testdata)
+        true_test_preds <- testdata$Q0aW
         
-        reduced_test_mse <- ldply(reduced_test_preds, risk_mse, full_test_preds)
+        reduced_test_mse <- ldply(reduced_test_preds, risk_diff_mse, full_test_preds, 
+            true_test_preds)
         test_mse_df <- data.frame(test = reduced_test_mse$est, Vnode = Vnodes, metric = "regression mse")
         
-        full_test_dV <- dV_from_preds(full_test_preds)
-        reduced_test_dV <- lapply(reduced_test_preds, dV_from_preds)
+        full_test_dV <- dV_from_preds(full_test_preds, A_vals)
+        reduced_test_dV <- lapply(reduced_test_preds, dV_from_preds, A_vals)
+        true_test_dV <- dV_from_preds(full_test_preds, A_vals)
         
-        reduced_test_01 <- ldply(reduced_test_dV, risk_01, full_test_dV)
+        reduced_test_01 <- ldply(reduced_test_dV, risk_diff_01, full_test_dV, true_test_dV)
         test_01_df <- data.frame(test = reduced_test_01$est, Vnode = Vnodes, metric = "rule disagreement")
         
         full_test_EYd <- test_EYd(full_test_dV, testdata, Qbar0)
