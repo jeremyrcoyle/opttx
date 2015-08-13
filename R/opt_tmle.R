@@ -89,7 +89,7 @@ opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode
     rule_args <- list(folds = folds, Y = data[, nodes$Ynode], X = data[, nodes$Vnodes, 
         drop = F], cts.num = 10, split_preds = split_preds, full_preds = full_preds, 
         SL.library = SL.library$QaV, family = gaussian(), cvfun = QaV_cv_SL, .parallel = parallel, 
-        blip_type = "DR", use_full = F, method = mvSLmethod)  # EYdmethod)   # mvSLmethod)  # 
+        blip_type = "blip2", use_full = F, method = mvSLmethod)  # EYdmethod)   # mvSLmethod)  # 
     
     fits$rule_fit <- split_from_args(rule_args)
     

@@ -54,11 +54,14 @@ backward_vim <- function(opt_obj, testdata = NULL, Qbar0 = NULL) {
     full_fit$Vnodes <- Vnodes
     rule_args <- opt_obj$rule_args
     
+    full_fit <- split_to_nested(full_fit, rule_args)
+    
     reduced_fits <- lapply(Vnodes, function(drop_Vnode) {
         cat(sprintf("Vnode %s\n", drop_Vnode))
         newV <- setdiff(Vnodes, drop_Vnode)
         rule_args$X <- opt_obj$data[, newV, drop = F]
         reduced_fit <- split_from_args(rule_args)
+        reduced_fit <- split_to_nested(reduced_fit, rule_args)
         reduced_fit$Vnodes <- newV
         
         reduced_fit
@@ -79,6 +82,8 @@ backward_vim <- function(opt_obj, testdata = NULL, Qbar0 = NULL) {
     reduced_dV <- lapply(reduced_preds, dV_from_preds, A_vals)
     true_dV <- dV_from_preds(true_preds, A_vals)
     
+    ldply(reduced_dV, risk_01, true_dV)
+    risk_01(full_dV, true_dV)
     reduced_01 <- ldply(reduced_dV, risk_diff_01, full_dV, true_dV)
     reduced_01$Vnode <- Vnodes
     reduced_01$metric <- "rule disagreement"
@@ -136,54 +141,143 @@ backward_vim <- function(opt_obj, testdata = NULL, Qbar0 = NULL) {
 }
 
 
-vis_preds <- function() {
+vis_preds <- function(vimresult, data) {
+    index <- 8
+    SL.library <- c("SL.glm", "SL.loess", "SL.mean")
+    mvSL.library <- sl_to_mv_library(SL.library)
+    all_diffs <- ldply(setdiff(1:length(Vnodes), 7), function(index) {
+        
+        diffmat <- vimresult$reduced_preds[[index]]  #vimresult$full_preds - vimresult$reduced_preds[[index]]
+        Vnode <- Vnodes[index]
+        print(Vnode)
+        V <- data[, Vnode, drop = F]
+        
+        # sl <- origami_SuperLearner(folds = result$folds, Y = diffmat, X = V, SL.library
+        # = mvSL.library, method = method.mvSL(method.NNLS())) predmat <- predict(sl,
+        # newdata = V)$pred
+        diffs <- as.data.frame(diffmat)
+        diffs$Vnode <- Vnode
+        diffs$V <- V[, 1]
+        diffs
+        
+    })
     
-    list(preds = preds, dV = dV, EYd = EYd)
+    A_vals <- vals_from_factor(data[, Anode])
     
-    compare_preds <- function(full, reduced, Vdata) {
-        all_diffs <- ldply(1:length(Vnodes), function(index) {
-            diffs <- as.data.frame(full - reduced[[index]])
-            diffs$Vnode <- Vnodes[index]
-            diffs$V <- Vdata[, Vnodes[index]]
-            diffs
-        })
-        long <- melt(all_diffs, id = c("Vnode", "V"))
-    }
+    names(all_diffs)[1:3] <- as.character(A_vals)
+    diffdf <- melt(all_diffs, id = c("Vnode", "V"))
+    diffdf
     
-    diff_preds <- compare_preds(full_preds, reduced_preds, opt_obj$data)
-    # diff_preds <- compare_preds(factor_to_indicators(full_dV),
-    # lapply(reduced_dV,factor_to_indicators), opt_obj$data)
-    diff_preds$variable <- levels(opt_obj$val_preds$A)[diff_preds$variable]
     # testdiff_preds <- compare_preds(full_test_preds, reduced_test_preds, testdata)
-    goodnodes <- tail(levels(reducedlong$Vnode), 100)
-    ct.num <- sapply(opt_obj$data[, Vnodes], function(x) length(unique(x)))
-    diff_preds <- diff_preds[(diff_preds$Vnode %in% goodnodes), ]
+    ct.num <- sapply(data[, Vnodes], function(x) length(unique(x)))
+    # diff_preds <- diff_preds[(diff_preds$Vnode %in% goodnodes), ]
     V_facts <- Vnodes[which(ct.num < 5)]
-    diff_conts <- diff_preds[!(diff_preds$Vnode %in% V_facts), ]
-    test <- ddply(diff_conts, .(Vnode), function(nodedata) {
+    diff_conts <- diffdf[!(diffdf$Vnode %in% V_facts), ]
+    
+    # trim extreme values so we show only were there's support
+    diff_conts <- ddply(diff_conts, .(Vnode), function(nodedata) {
         quants <- quantile(nodedata$V, c(0.025, 0.975))
-        print(nodedata$Vnode[1])
-        print(quants)
         nodedata[quants[1] < nodedata$V & nodedata$V < quants[2], ]
     })
     
-    dim(diff_conts)
     pdf("vim_cont.pdf", height = 6, width = 8)
-    ggplot(test, aes(x = V)) + facet_wrap(~Vnode, scales = "free") + geom_smooth(aes(y = value, 
-        color = variable, group = variable), method = "loess") + geom_rug(data = test[test$variable == 
-        test$variable[1], ], color = "black", alpha = 0.8, sides = "b") + theme_bw() + 
-        coord_cartesian(ylim = c(-0.01, 0.01))
+    ggplot(diff_conts, aes(x = V)) + facet_wrap(~Vnode, scales = "free") + geom_point(aes(y = value, 
+        color = variable, group = variable), alpha = 0.2) + geom_smooth(aes(y = value, 
+        color = variable), method = "loess", se = F) + geom_rug(data = diff_conts[diff_conts$variable == 
+        diff_conts$variable[1], ], color = "black", alpha = 0.2, sides = "b") + theme_bw()
     dev.off()
-    diff_facts <- diff_preds[diff_preds$Vnode %in% V_facts, ]
-    ggplot(diff_facts, aes(x = factor(V))) + facet_wrap(~Vnode, scales = "free") + 
-        geom_boxplot(aes(y = value, fill = variable), position = "dodge") + theme_bw() + 
-        coord_cartesian(ylim = range(diff_facts$value))
+    
+    pdf("~/Dropbox/thesis/quals/slides/graphs/vim_pulse.pdf", height = 3, width = 6)
+    ggplot(diff_conts[diff_conts$Vnode == "PULSEVS", ], aes(x = V)) + geom_line(aes(y = value, 
+        color = variable, group = variable)) + geom_rug(data = diff_conts[diff_conts$variable == 
+        diff_conts$variable[1] & diff_conts$Vnode == "PULSEVS", ], color = "black", 
+        alpha = 0.2, sides = "b") + theme_bw() + xlab("Pulse (BPM)") + ylab("Q(V)-Q(V')")
+    dev.off()
+    
+    dodge <- position_dodge(width = 0.5)
+    injtype <- diffdf[diffdf$Vnode == "X_1STPENE", ]
+    injtype$V <- factor(injtype$V, levels = c(1, 2), labels = c("Blunt", "Penetrating"))
+    pdf("~/Dropbox/thesis/quals/slides/graphs/vim_injurtytype.pdf", height = 3, width = 4)
+    ggplot(injtype, aes(x = factor(V))) + geom_point(aes(y = value, color = variable), 
+        position = dodge) + theme_bw() + ylab("Q(V)-Q(V')") + xlab("Injury Type")
+    dev.off()
     aggregate(value ~ Vnode, diff_preds, var)
     aggregate(value ~ Vnode, testdiff_preds, var)
     diff_dV <- full$dV - reduced$dV
     diff_EYd <- with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], 
         val_preds$pA, val_preds$QaW, full$dV, reduced$dV))
 }
+
+vis_preds <- function(vimresult, data) {
+    index <- 8
+    mnSL.library <- c("mvSL.multinom", "mnSL.mean")
+    
+    all_diffs <- ldply(1:length(Vnodes), function(index) {
+        full_dV <- dV_from_preds(vimresult$full_preds, A_vals)
+        red_dV <- dV_from_preds(vimresult$reduced_preds[[index]])
+        Vnode <- Vnodes[index]
+        V <- data[, Vnode, drop = F]
+        
+        full_sl <- origami_SuperLearner(folds = result$folds, Y = full_dV, X = V, 
+            SL.library = mnSL.library, method = method.mnNNloglik(), family = list(family = "multinomial"))
+        red_sl <- origami_SuperLearner(folds = result$folds, Y = red_dV, X = V, SL.library = mnSL.library, 
+            method = method.mnNNloglik(), family = list(family = "multinomial"))
+        full_pred <- predict(full_sl, newdata = V)$pred
+        red_pred <- predict(red_sl, newdata = V)$pred
+        
+        diffs <- as.data.frame(full_pred - red_pred)
+        diffs$Vnode <- Vnode
+        diffs$V <- V[, 1]
+        diffs
+        
+    })
+    
+    A_vals <- vals_from_factor(data[, Anode])
+    
+    names(all_diffs)[1:3] <- as.character(A_vals)
+    diffdf <- melt(all_diffs, id = c("Vnode", "V"))
+    
+    
+    # testdiff_preds <- compare_preds(full_test_preds, reduced_test_preds, testdata)
+    ct.num <- sapply(data[, Vnodes], function(x) length(unique(x)))
+    # diff_preds <- diff_preds[(diff_preds$Vnode %in% goodnodes), ]
+    V_facts <- Vnodes[which(ct.num < 5)]
+    diff_conts <- diffdf[!(diffdf$Vnode %in% V_facts), ]
+    
+    # trim extreme values so we show only were there's support
+    diff_conts <- ddply(diff_conts, .(Vnode), function(nodedata) {
+        quants <- quantile(nodedata$V, c(0.025, 0.975))
+        nodedata[quants[1] < nodedata$V & nodedata$V < quants[2], ]
+    })
+    
+    pdf("vim_cont.pdf", height = 6, width = 8)
+    ggplot(diff_conts, aes(x = V)) + facet_wrap(~Vnode, scales = "free") + geom_line(aes(y = value, 
+        color = variable, group = variable)) + geom_rug(data = diff_conts[diff_conts$variable == 
+        diff_conts$variable[1], ], color = "black", alpha = 0.2, sides = "b") + theme_bw()
+    dev.off()
+    
+    pdf("~/Dropbox/thesis/quals/slides/graphs/vim_pulse.pdf", height = 3, width = 6)
+    ggplot(diff_conts[diff_conts$Vnode == "PULSEVS", ], aes(x = V)) + geom_line(aes(y = value, 
+        color = variable, group = variable)) + geom_rug(data = diff_conts[diff_conts$variable == 
+        diff_conts$variable[1] & diff_conts$Vnode == "PULSEVS", ], color = "black", 
+        alpha = 0.2, sides = "b") + theme_bw() + xlab("Pulse (BPM)") + ylab("P(d(V)=a)-P(d(V')=a)")
+    dev.off()
+    
+    dodge <- position_dodge(width = 0.5)
+    injtype <- diffdf[diffdf$Vnode == "X_1STPENE", ]
+    injtype$V <- factor(injtype$V, levels = c(1, 2), labels = c("Blunt", "Penetrating"))
+    pdf("~/Dropbox/thesis/quals/slides/graphs/vim_injurtytype.pdf", height = 3, width = 4)
+    ggplot(injtype, aes(x = factor(V))) + geom_point(aes(y = value, color = variable), 
+        position = dodge) + theme_bw() + ylab("Q(V)-Q(V')") + xlab("Injury Type")
+    dev.off()
+    aggregate(value ~ Vnode, diff_preds, var)
+    aggregate(value ~ Vnode, testdiff_preds, var)
+    diff_dV <- full$dV - reduced$dV
+    diff_EYd <- with(opt_obj, two_rule_tmle(data[, nodes$Anode], data[, nodes$Ynode], 
+        val_preds$pA, val_preds$QaW, full$dV, reduced$dV))
+}
+
+
 # todo: be clever about categorical V
 forward_vim <- function(opt_obj, V) {
     opt_obj <- result
