@@ -1,12 +1,11 @@
 # currently unused functions, need to reincorporate into library
 
-# function to construct blip dataset from fold-specific fits and then conduct
-# superlearner to learn the blip function while respecting the CV V is vector of
-# covariate names testing data fold=folds[[1]] Y=data$Y X=data[,c('A',W,missind)]
-# family=binomial() SL.library=c('SL.glm','SL.glmnet','SL.rpart','SL.mean')
-# id=1:nrow(X) obsWeights=1
-blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, Q_fit, 
-    g_fit, use_full = F, ...) {
+# function to construct blip dataset from fold-specific fits and then conduct superlearner to learn
+# the blip function while respecting the CV V is vector of covariate names testing data
+# fold=folds[[1]] Y=data$Y X=data[,c('A',W,missind)] family=binomial()
+# SL.library=c('SL.glm','SL.glmnet','SL.rpart','SL.mean') id=1:nrow(X) obsWeights=1
+blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, Q_fit, g_fit, use_full = F, 
+    ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()
@@ -27,8 +26,7 @@ blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, Q_fit,
     new.data$A <- 1
     Q1W <- predict(splitQ_fit, newdata = new.data)$pred
     
-    # we don't want A in X from here on out glmnet gets picky if there's extra
-    # columns in the data
+    # we don't want A in X from here on out glmnet gets picky if there's extra columns in the data
     A <- X$A
     X$A <- NULL
     pA1 <- predict(splitg_fit, X)$pred
@@ -38,30 +36,29 @@ blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, Q_fit,
     Z <- as.numeric(D1 < 0)
     K <- as.vector(abs(D1))  #D1 is a matrix somehow
     
-    # should probably be more careful with obsWeights here fit split-specific blip
-    # based on split-specific Q and g
+    # should probably be more careful with obsWeights here fit split-specific blip based on
+    # split-specific Q and g
     cv_SL(fold, Z, X[, V, drop = F], SL.library, family, obsWeights * K, id, ...)
     # cv_SL(fold, D1, X[,V,drop=F], SL.library, family, obsWeights, id, ...)
 }
 
 fitQ <- function(folds = folds, Y, X, SL.library = Qlibrary) {
-    origami_SuperLearner(folds = folds, Y, X, family = binomial(), SL.library = SL.library, 
-        cts.num = 5, nfolds = 5)
+    origami_SuperLearner(folds = folds, Y, X, family = binomial(), SL.library = SL.library, cts.num = 5, 
+        nfolds = 5)
 }
 
 fit_Q <- function(data, folds, nodes, verbose, ...) {
     # fit Q and g
     message_verbose("Fitting Q", 1, verbose)
     # todo: add support for continuous Y
-    Q_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, c(nodes$Anode, 
-        nodes$Wnodes)], family = binomial(), SL.library = SL.library$Q, cts.num = 5, 
-        .parallel = parallel, method = method.NNloglik(), control = list(trimLogit = 1e-05))
+    Q_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, c(nodes$Anode, nodes$Wnodes)], 
+        family = binomial(), SL.library = SL.library$Q, cts.num = 5, .parallel = parallel, method = method.NNloglik(), 
+        control = list(trimLogit = 1e-05))
     Q_fit <- drop_zero_learners(Q_fit)
 }
 
 # fully fits Q and g SLs in each fold of rule SL
-nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, 
-    fitQ, fitg, ...) {
+nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V, fitQ, fitg, ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()
@@ -81,8 +78,7 @@ nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V,
     new.data$A <- 1
     Q1W <- predict(splitQ_fit, newdata = new.data)$pred
     
-    # we don't want A in X from here on out glmnet gets picky if there's extra
-    # columns in the data
+    # we don't want A in X from here on out glmnet gets picky if there's extra columns in the data
     A <- X$A
     X$A <- NULL
     pA1 <- predict(splitg_fit, X)$pred
@@ -92,8 +88,8 @@ nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V,
     Z <- as.numeric(D1 < 0)
     K <- as.vector(abs(D1))  #D1 is a matrix somehow
     
-    # should probably be more careful with obsWeights here fit split-specific blip
-    # based on split-specific Q and g
+    # should probably be more careful with obsWeights here fit split-specific blip based on
+    # split-specific Q and g
     cv_SL(fold, Z, X[, V, drop = F], SL.library, family, obsWeights * K, id, ...)
     # cv_SL(fold, D1, X[,V,drop=F], SL.library, family, obsWeights, id, ...)
 }
@@ -104,8 +100,7 @@ nested_blip_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, V,
 #' @export
 #'
 method.EYd <- function(nuisance_preds) {
-    out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, 
-        obsWeights, ...) {
+    out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, obsWeights, ...) {
         
         
         A_vals <- vals_from_factor(nuisance_preds$A)
@@ -114,8 +109,8 @@ method.EYd <- function(nuisance_preds) {
             dV <- A_vals[dV_from_preds(mn_pred(alpha, Z))]
             
             # -1 * nA * mean(factor_to_indicators(dV) * nuisance_preds$DR) #DR-IPCW
-            -1 * rule_tmle(nuisance_preds$A, nuisance_preds$Y, nuisance_preds$pA, 
-                nuisance_preds$QaW, dV)$est
+            -1 * rule_tmle(nuisance_preds$A, nuisance_preds$Y, nuisance_preds$pA, nuisance_preds$QaW, 
+                dV)$est
         }
         
         num_alg <- dim(Z)[3]
@@ -133,8 +128,8 @@ method.EYd <- function(nuisance_preds) {
         
         # optimize starting in that neighborhood
         n <- dim(Z)[1]
-        fit <- nloptr(x0 = optim_init, eval_f = EYd_alpha, lb = rep(0, num_alg), 
-            opts = list(algorithm = "NLOPT_LN_SBPLX", ftol_rel = 1/n, maxeval = n))
+        fit <- nloptr(x0 = optim_init, eval_f = EYd_alpha, lb = rep(0, num_alg), opts = list(algorithm = "NLOPT_LN_SBPLX", 
+            ftol_rel = 1/n, maxeval = n))
         
         coef <- normalize(fit$solution)
         
@@ -153,15 +148,13 @@ method.EYd <- function(nuisance_preds) {
 #' @export
 #'
 method.surlog <- function() {
-    out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, 
-        obsWeights, ...) {
+    out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, obsWeights, ...) {
         surlog <- function(wgts, Y, preds) {
             mean(wgts * (-plogis((2 * Y - 1) * (preds), log.p = TRUE)))
         }
         
         
-        # cvRisk <- apply(Z, 2, function(x) { -mean(obsWeights * ifelse(Y, log(x), log(1
-        # - x))) })
+        # cvRisk <- apply(Z, 2, function(x) { -mean(obsWeights * ifelse(Y, log(x), log(1 - x))) })
         
         preds <- Z - 1/2
         wgts <- obsWeights
@@ -180,8 +173,8 @@ method.surlog <- function() {
             coef <- 1
         } else {
             init <- rep(1/num.alg, num.alg)
-            alpha.out <- optim(init, risk.fun, method = "L-BFGS-B", lower = rep(0, 
-                num.alg), upper = rep(1, num.alg))$par
+            alpha.out <- optim(init, risk.fun, method = "L-BFGS-B", lower = rep(0, num.alg), upper = rep(1, 
+                num.alg))$par
             coef <- (alpha.out/sum(alpha.out))
         }
         out <- list(cvRisk = cvRisk, coef = coef)
@@ -194,8 +187,8 @@ method.surlog <- function() {
 }
 
 method.probloglik <- function() {
-    out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, 
-        obsWeights, control, ...) {
+    out <- list(require = NULL, computeCoef = function(Z, Y, libraryNames, verbose, obsWeights, control, 
+        ...) {
         cvRisk <- apply(Z, 2, function(x) {
             -mean(obsWeights * ifelse(Y, log(x), log(1 - x)))
         })
@@ -210,8 +203,7 @@ method.probloglik <- function() {
                 p <- plogis(eta)
                 -2 * t(w * dlogis(eta) * (y/p - (1 - y)/(1 - p))) %*% X
             }
-            fit <- optim(start, fmin, gmin, X = x, y = y, w = wt, method = "L-BFGS-B", 
-                lower = 0, ...)
+            fit <- optim(start, fmin, gmin, X = x, y = y, w = wt, method = "L-BFGS-B", lower = 0, ...)
             invisible(fit)
         }
         tempZ <- trimLogit(Z, trim = control$trimLogit)
@@ -252,8 +244,8 @@ refit_split <- function(fold, fit, ...) {
     valid_Z <- index_dim(Z, valid_index)
     
     
-    coef <- fit$fullFit$method$computeCoef(train_Z, train_Y, names(fit$cvRisk), T, 
-        obsWeights = train_weights, ...)$coef
+    coef <- fit$fullFit$method$computeCoef(train_Z, train_Y, names(fit$cvRisk), T, obsWeights = train_weights, 
+        ...)$coef
     
     pred <- fit$fullFit$method$computePred(valid_Z, coef)
     

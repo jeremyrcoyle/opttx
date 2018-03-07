@@ -1,0 +1,707 @@
+vars=all.vars(form)
+params=setdiff(vars,names(data))
+gradexp=deriv(form,params)
+frame=cbind(data,t(psi))[,vars]
+derivs=apply(frame,1,evalderiv,gradexp)
+preds=sapply(derivs,function(x){x$value})
+calcloss=function(vals,data){#
+	form=formula(rate~maxrate*conc/(conc+halfconc))	vars=all.vars(form)#
+	params=setdiff(vars,names(data))#
+	gradexp=deriv(form,params)#
+	frame=cbind(data,t(psi))[,vars]	#
+	derivs=apply(frame,1,evalderiv,gradexp)	#
+	preds=sapply(derivs,function(x){x$value})#
+	y=frame[,vars[1]]#
+	r=preds-y#
+	loss=sum(r^2)#
+}
+form=formula(rate~maxrate*conc/(conc+halfconc))	vars=all.vars(form)
+calcloss=function(vals,data){#
+	form=formula(rate~maxrate*conc/(conc+halfconc))	#
+	  vars=all.vars(form)#
+	params=setdiff(vars,names(data))#
+	gradexp=deriv(form,params)#
+	frame=cbind(data,t(psi))[,vars]	#
+	derivs=apply(frame,1,evalderiv,gradexp)	#
+	preds=sapply(derivs,function(x){x$value})#
+	y=frame[,vars[1]]#
+	r=preds-y#
+	loss=sum(r^2)#
+}
+calcloss=function(psi,data){#
+	form=formula(rate~maxrate*conc/(conc+halfconc))	#
+	  vars=all.vars(form)#
+	params=setdiff(vars,names(data))#
+	gradexp=deriv(form,params)#
+	frame=cbind(data,t(psi))[,vars]	#
+	derivs=apply(frame,1,evalderiv,gradexp)	#
+	preds=sapply(derivs,function(x){x$value})#
+	y=frame[,vars[1]]#
+	r=preds-y#
+	loss=sum(r^2)#
+}
+calcloss=function(psi,data){#
+	form=formula(rate~maxrate*conc/(conc+halfconc))	#
+	  vars=all.vars(form)#
+	params=setdiff(vars,names(data))#
+	gradexp=deriv(form,params)#
+	frame=cbind(data,t(psi))[,vars]	#
+	derivs=apply(frame,1,evalderiv,gradexp)	#
+	preds=sapply(derivs,function(x){x$value})#
+	y=frame[,vars[1]]#
+	r=preds-y#
+	sum(r^2)#
+}
+objective=apply(paramgrid,1,calcloss,data)
+vals=paramgrid[,1]
+vals
+vals=paramgrid[1,]
+calcloss(paramgrid[1,],data)
+vals=paramgrid[1,]
+vals
+paramgrid=data.frame(expand.grid(maxrate=maxrate,halfconc=halfconc))
+vals=paramgrid[1,]
+vals
+objective=apply(paramgrid,1,calcloss,data)
+objective
+paramgrid$objective=apply(paramgrid,1,calcloss,data)
+?contour
+contour(paramgrid$maxrate,paramgrid$halfconc,paramgrid$objective)
+paramgrid$maxrate
+ggplot(paramgrid,aes(x=maxrate,y=halfconc,z=objective))+stat_contour()
+library(ggplot2)
+ggplot(paramgrid,aes(x=maxrate,y=halfconc,z=objective))+stat_contour()
+head(paramgrid)
+library(reshape2) # for melt#
+volcano3d <- melt(volcano)
+head(volcano3d)
+table(volcano3d$Var1,volcano3d$Var2)
+table(paramgrid$maxconc,paramgrid$halfrate)
+str(paramgrid)
+table(paramgrid$maxrate,paramgrid$halfconc)
+maxrate=seq(from=207,to=217,length.out=1000)
+maxrate
+halfconc
+paramgrid=data.frame(expand.grid(maxrate=maxrate,halfconc=halfconc))
+dim(paramgrid)
+paramgrid$objective=apply(paramgrid,1,calcloss,data)
+psi1.0=max(y)#
+max(y)/2#
+psi2.0=w[y==107]#
+psihat=t(cbind(psi1.0,psi2.0))#
+colph=ncol(psihat)#
+#
+psi1.f=function(w){#
+  -w/(w+psi[2,colph])#
+}#
+#
+psi2.f=function(w){#
+  (psi[1,colph]*w)/((w+psi[2,colph])^2)#
+}#
+#
+loss.mm=function(psi){#
+  (y-((psi[1,]*w)/(w+psi[2,])))^2#
+}#
+mm=function(psi){#
+  wmat=as.matrix(w)#
+  done=0#
+  while(!done){#
+    dh.1=NULL#
+    dh.2=NULL#
+    colph=ncol(psi)#
+    dh.1=apply(wmat,1,psi1.f)#
+    dh.2=apply(wmat,1,psi2.f)#
+    dh=cbind(dh.1,dh.2)  #
+    Ystar=y-((psi[1,colph]*w)/(w+psi[2,colph]))#
+    psi.i=psi[,colph]-solve(t(dh)%*%dh)%*%t(dh)%*%Ystar#
+    psi=cbind(psi,psi.i)#
+    rownames(psi)=c("psi1","psi2")#
+    colph=ncol(psi)#
+    psimat=as.matrix(psi[,colph])#
+    loss.all=matrix(NA,12,colph)#
+    for(j in 1:colph){#
+      for(i in 1:12){#
+        loss.all[i,j]= (y[i]-((psi[1,j]*w[i])/(w[i]+psi[2,j])))^2#
+      }#
+    }#
+    emp.risk.all=apply(loss.all,2,mean)#
+    if (max(abs((psi[,(colph-1)]-psi[,colph])/psi[,(colph-1)]))<tol) done=1#
+    out=rbind(psi,emp.risk.all)#
+  }#
+  return(out)#
+}#
+#
+mmest=mm(psi=psihat)
+psi1.0=max(y)#
+max(y)/2#
+psi2.0=w[y==107]#
+psihat=t(cbind(psi1.0,psi2.0))#
+colph=ncol(psihat)#
+#
+psi1.f=function(w){#
+  -w/(w+psi[2,colph])#
+}#
+#
+psi2.f=function(w){#
+  (psi[1,colph]*w)/((w+psi[2,colph])^2)#
+}#
+#
+loss.mm=function(psi){#
+  (y-((psi[1,]*w)/(w+psi[2,])))^2#
+}
+psi1.0=max(y)#
+max(y)/2#
+psi2.0=w[y==107]#
+psihat=t(cbind(psi1.0,psi2.0))#
+colph=ncol(psihat)
+psi1.0=max(y)
+max(y)/2
+psi2.0=w[y==107]
+psi2.0=0.06
+psi1.0=max(y)
+psi1.0
+y=Puromycin$rate
+y=data$rate
+data=Puromycin
+data=data[data$state=="treated",]
+y=data$rate
+w=data$conc
+w
+y
+psi1.0=max(y)
+psi2.0=0.06
+psihat=t(cbind(psi1.0,psi2.0))
+psi2.0=0.08
+psihat=t(cbind(psi1.0,psi2.0))
+colph=ncol(psihat)
+colph
+psi1.f=function(w){#
+  -w/(w+psi[2,colph])#
+}
+psi1.0=max(y)#
+max(y)/2#
+psi2.0=0.08#
+psihat=t(cbind(psi1.0,psi2.0))#
+colph=ncol(psihat)#
+#
+psi1.f=function(w){#
+  -w/(w+psi[2,colph])#
+}#
+#
+psi2.f=function(w){#
+  (psi[1,colph]*w)/((w+psi[2,colph])^2)#
+}#
+#
+loss.mm=function(psi){#
+  (y-((psi[1,]*w)/(w+psi[2,])))^2#
+}#
+mm=function(psi){#
+  wmat=as.matrix(w)#
+  done=0#
+  while(!done){#
+    dh.1=NULL#
+    dh.2=NULL#
+    colph=ncol(psi)#
+    dh.1=apply(wmat,1,psi1.f)#
+    dh.2=apply(wmat,1,psi2.f)#
+    dh=cbind(dh.1,dh.2)  #
+    Ystar=y-((psi[1,colph]*w)/(w+psi[2,colph]))#
+    psi.i=psi[,colph]-solve(t(dh)%*%dh)%*%t(dh)%*%Ystar#
+    psi=cbind(psi,psi.i)#
+    rownames(psi)=c("psi1","psi2")#
+    colph=ncol(psi)#
+    psimat=as.matrix(psi[,colph])#
+    loss.all=matrix(NA,12,colph)#
+    for(j in 1:colph){#
+      for(i in 1:12){#
+        loss.all[i,j]= (y[i]-((psi[1,j]*w[i])/(w[i]+psi[2,j])))^2#
+      }#
+    }#
+    emp.risk.all=apply(loss.all,2,mean)#
+    if (max(abs((psi[,(colph-1)]-psi[,colph])/psi[,(colph-1)]))<tol) done=1#
+    out=rbind(psi,emp.risk.all)#
+  }#
+  return(out)#
+}#
+#
+mmest=mm(psi=psihat)
+data(Puromycin)#
+data=Puromycin#
+data=data[data$state=="treated",]#
+y=data$rate#
+w=data$conc#
+psi1.0=max(y)#
+max(y)/2#
+psi2.0=w[y==107]#
+psihat=t(cbind(psi1.0,psi2.0))#
+colph=ncol(psihat)#
+#
+psi1.f=function(w){#
+  -w/(w+psi[2,colph])#
+}#
+#
+psi2.f=function(w){#
+  (psi[1,colph]*w)/((w+psi[2,colph])^2)#
+}#
+#
+loss.mm=function(psi){#
+  (y-((psi[1,]*w)/(w+psi[2,])))^2#
+}#
+mm=function(psi){#
+  wmat=as.matrix(w)#
+  done=0#
+  while(!done){#
+    dh.1=NULL#
+    dh.2=NULL#
+    colph=ncol(psi)#
+    dh.1=apply(wmat,1,psi1.f)#
+    dh.2=apply(wmat,1,psi2.f)#
+    dh=cbind(dh.1,dh.2)  #
+    Ystar=y-((psi[1,colph]*w)/(w+psi[2,colph]))#
+    psi.i=psi[,colph]-solve(t(dh)%*%dh)%*%t(dh)%*%Ystar#
+    psi=cbind(psi,psi.i)#
+    rownames(psi)=c("psi1","psi2")#
+    colph=ncol(psi)#
+    psimat=as.matrix(psi[,colph])#
+    loss.all=matrix(NA,12,colph)#
+    for(j in 1:colph){#
+      for(i in 1:12){#
+        loss.all[i,j]= (y[i]-((psi[1,j]*w[i])/(w[i]+psi[2,j])))^2#
+      }#
+    }#
+    emp.risk.all=apply(loss.all,2,mean)#
+    if (max(abs((psi[,(colph-1)]-psi[,colph])/psi[,(colph-1)]))<tol) done=1#
+    out=rbind(psi,emp.risk.all)#
+  }#
+  return(out)#
+}#
+#
+mmest=mm(psi=psihat)
+psi1.0=max(y)
+max(y)/2
+psi2.0=w[y==107]
+psihat=t(cbind(psi1.0,psi2.0))
+colph=ncol(psihat)
+psi1.f=function(w){#
+  -w/(w+psi[2,colph])#
+}
+psi1.f=function(w){
+-w/(w+psi[2,colph])
+psi1.f=function(w){#
+		-w/(w+psi[2,colph])#
+}
+y=Puromycin$rate[Puromycin$state=="treated"]
+w=Puromycin$conc[Puromycin$state=="treated"]
+initial guess#
+psi1.0=max(y)#
+max(y)/2#
+psi2.0=w[y==107]#
+psihat=t(cbind(psi1.0,psi2.0))#
+colph=ncol(psihat)
+psi1.f=function(w){#
+  -w/(w+psi[2,colph])#
+}
+psi2.f=function(w){#
+  (psi[1,colph]*w)/((w+psi[2,colph])^2)#
+}
+loss.mm=function(psi){#
+  (y-((psi[1,]*w)/(w+psi[2,])))^2#
+}
+mm=function(psi){#
+  wmat=as.matrix(w)#
+  done=0#
+  while(!done){#
+    dh.1=NULL#
+    dh.2=NULL#
+    colph=ncol(psi)#
+    dh.1=apply(wmat,1,psi1.f)#
+    dh.2=apply(wmat,1,psi2.f)#
+    dh=cbind(dh.1,dh.2)  #
+    Ystar=y-((psi[1,colph]*w)/(w+psi[2,colph]))#
+    psi.i=psi[,colph]-solve(t(dh)%*%dh)%*%t(dh)%*%Ystar#
+    psi=cbind(psi,psi.i)#
+    rownames(psi)=c("psi1","psi2")#
+    colph=ncol(psi)#
+    psimat=as.matrix(psi[,colph])#
+    loss.all=matrix(NA,12,colph)#
+    for(j in 1:colph){#
+      for(i in 1:12){#
+        loss.all[i,j]= (y[i]-((psi[1,j]*w[i])/(w[i]+psi[2,j])))^2#
+      }#
+    }#
+    emp.risk.all=apply(loss.all,2,mean)#
+    if (max(abs((psi[,(colph-1)]-psi[,colph])/psi[,(colph-1)]))<tol) done=1#
+    out=rbind(psi,emp.risk.all)#
+  }#
+  return(out)#
+}
+mmest=mm(psi=psihat)
+traceback()
+psi1.f
+PH 240C HW2#
+#Jade#
+#
+#Question 2#
+y=Puromycin$rate[Puromycin$state=="treated"]#
+w=Puromycin$conc[Puromycin$state=="treated"]#
+#
+#Bivariate#
+plot(w,y,pch=16,ylab="Reaction rate under Puromycin treatment",#
+     xlab="Substrate concentration under Puromycin treatment")#
+lines(lowess(w,y),col="blue")#
+abline(a=47,b=157,col="red")#
+#
+#initial guess#
+psi1.0=max(y)#
+max(y)/2#
+psi2.0=w[y==107]#
+psihat=t(cbind(psi1.0,psi2.0))#
+colph=ncol(psihat)#
+#
+psi1.f=function(w,psi){#
+  -w/(w+psi[2,colph])#
+}#
+#
+psi2.f=function(w,psi){#
+  (psi[1,colph]*w)/((w+psi[2,colph])^2)#
+}#
+#
+loss.mm=function(psi){#
+  (y-((psi[1,]*w)/(w+psi[2,])))^2#
+}#
+mm=function(psi){#
+  wmat=as.matrix(w)#
+  done=0#
+  while(!done){#
+    dh.1=NULL#
+    dh.2=NULL#
+    colph=ncol(psi)#
+    dh.1=apply(wmat,1,psi1.f,psi)#
+    dh.2=apply(wmat,1,psi2.f,psi)#
+    dh=cbind(dh.1,dh.2)  #
+    Ystar=y-((psi[1,colph]*w)/(w+psi[2,colph]))#
+    psi.i=psi[,colph]-solve(t(dh)%*%dh)%*%t(dh)%*%Ystar#
+    psi=cbind(psi,psi.i)#
+    rownames(psi)=c("psi1","psi2")#
+    colph=ncol(psi)#
+    psimat=as.matrix(psi[,colph])#
+    loss.all=matrix(NA,12,colph)#
+    for(j in 1:colph){#
+      for(i in 1:12){#
+        loss.all[i,j]= (y[i]-((psi[1,j]*w[i])/(w[i]+psi[2,j])))^2#
+      }#
+    }#
+    emp.risk.all=apply(loss.all,2,mean)#
+    if (max(abs((psi[,(colph-1)]-psi[,colph])/psi[,(colph-1)]))<tol) done=1#
+    out=rbind(psi,emp.risk.all)#
+  }#
+  return(out)#
+}#
+#
+mmest=mm(psi=psihat)
+mm=function(psi){#
+  wmat=as.matrix(w)#
+  done=0#
+  while(!done){#
+    dh.1=NULL#
+    dh.2=NULL#
+    colph=ncol(psi)#
+    dh.1=apply(wmat,1,psi1.f,psi)#
+    dh.2=apply(wmat,1,psi2.f,psi)#
+    dh=cbind(dh.1,dh.2)  #
+    Ystar=y-((psi[1,colph]*w)/(w+psi[2,colph]))#
+    psi.i=psi[,colph]-solve(t(dh)%*%dh)%*%t(dh)%*%Ystar#
+    psi=cbind(psi,psi.i)#
+    rownames(psi)=c("psi1","psi2")#
+    colph=ncol(psi)#
+    psimat=as.matrix(psi[,colph])#
+    loss.all=matrix(NA,12,colph)#
+    for(j in 1:colph){#
+      for(i in 1:12){#
+        loss.all[i,j]= (y[i]-((psi[1,j]*w[i])/(w[i]+psi[2,j])))^2#
+      }#
+    }#
+    emp.risk.all=apply(loss.all,2,mean)#
+    tol=1e-8#
+    if (max(abs((psi[,(colph-1)]-psi[,colph])/psi[,(colph-1)]))<tol) done=1#
+    out=rbind(psi,emp.risk.all)#
+  }#
+  return(out)#
+}
+mmest=mm(psi=psihat)
+mmest
+?traceback
+library(SuperLearner)
+CV.SuperLearner
+SuperLearner
+ls()
+rm(list=ls())
+save.image()
+quartz()
+plot(rnorm(10))
+quartz()
+plot(rnorm(10),col="red")
+plot(rnorm(10),col="blue")
+dev.off()
+plot(rnorm(10),col="purple")
+dev.off()
+?dev.off
+load("/Users/jrcoyle/Dropbox/PH252D/PH252D Final Project/TMLE code/tmle_boot.RData")
+psi.boot
+unlist(psi.boot)
+length(unlist(psi.boot))
+quantile(psi.boot,c(0.025,0.975))
+quantile(unlist(psi.boot),c(0.025,0.975))
+library(graph)#
+degrees=c(rep(2,3))#
+names(degrees)=paste("node",seq_along(degrees)) #nodes must be names#
+x=randomNodeGraph(degrees)#
+plot(x)
+edgemode(x)="undirected"
+plot(x)
+edges(x)
+edgemode(x)="directed"
+plot(x)
+plot(ugraph(x))
+library(graph)#
+degrees=c(rep(2,3))#
+names(degrees)=paste("node",seq_along(degrees)) #nodes must be names#
+x=ugraph(randomNodeGraph(degrees))#
+#
+#verify graph#
+edges=edgeMatrix(x)#
+edgecount=table(as.vector(edges))#
+table(edgecount)
+plot(x)
+edges
+library(graph)
+degrees=c(rep(3,50),rep(10,50))
+names(degrees)=paste("node",seq_along(degrees)) #nodes must be names
+x=randomNodeGraph(degrees)
+edges=edgeMatrix(x)
+edgecount=table(as.vector(edges))
+table(edgecount)
+x2=ugraph(x)
+edges=edgeMatrix(x2)
+edgecount=table(as.vector(edges))
+table(edgecount)
+edges
+edges=edgeMatrix(x)
+x2=ugraph(x)
+edges2=edgeMatrix(x2)
+dim(edges)
+dim(edges2)
+degrees=c(rep(3,2),rep(1,4))
+names(degrees)=paste("node",seq_along(degrees)) #nodes must be names
+x=randomNodeGraph(degrees)
+plot(x)
+edges=edgeMatrix(x)
+edgecount=table(as.vector(edges))
+edgecount
+ugraph(x)
+plot(ugraph(x))
+plot(x)
+degrees=c(rep(2,2),rep(1,4))
+names(degrees)=paste("node",seq_along(degrees)) #nodes must be names
+x=randomNodeGraph(degrees)
+plot(x)
+ugraph(x)
+plot(ugraph(x))
+?ugraph
+load("/Users/jrcoyle/Dropbox/Buildings/Data/modelresults/results_Art_Museum_stlma.1month.rdata")
+load("/Users/jrcoyle/Dropbox/Buildings/Data/modelresults/results_Art_Museum_stlma.1day.rdata")
+x=load("/Users/jrcoyle/Dropbox/Buildings/Data/modelresults/results_Art_Museum_stlma.1day.rdata")
+str(x)
+head(modeldf)
+ls()
+a
+clear
+library(SuperLearner)
+x=1:10#
+y=1:10#
+xy=expand.grid(x=x,y=y)#
+s=rep(1,100)#
+v=rep(1,100)#
+h=runif(100)#
+str(xy)#
+test=seq(from=-0.5,to=1.5,by=0.25)#
+test%%1
+rbinom(100)
+rbinom(100,1)
+rbinom(100,1,0.5)
+(rbinom(100,1,0.5)-0.5)
+(rbinom(100,1,0.5)-0.5)/100
+for(i=1:300){#
+	h=h+(rbinom(100,1,0.5)-0.5)/100#
+	h=h%%1#
+	plot(xy$x,xy$y,col=hsv(h,s,v),pch=16,cex=6)#
+	Sys.sleep(0.1)#
+}
+for(i in 1:300){#
+	h=h+(rbinom(100,1,0.5)-0.5)/100#
+	h=h%%1#
+	plot(xy$x,xy$y,col=hsv(h,s,v),pch=16,cex=6)#
+	Sys.sleep(0.1)#
+}
+for(i in 1:300){#
+	h=h+(rbinom(100,1,0.5)-0.4)/50#
+	h=h%%1#
+	plot(xy$x,xy$y,col=hsv(h,s,v),pch=16,cex=6)#
+	Sys.sleep(0.1)#
+}
+for(i in 1:300){#
+	h=h+(rbinom(100,1,0.5)-0.33)/100#
+	h=h%%1#
+	plot(xy$x,xy$y,col=hsv(h,s,v),pch=16,cex=6)#
+	Sys.sleep(0.1)#
+}
+for(i in 1:300){#
+	h=h+ruinf(100)/100#
+	h=h%%1#
+	plot(xy$x,xy$y,col=hsv(h,s,v),pch=16,cex=6)#
+	Sys.sleep(0.1)#
+}
+for(i in 1:300){#
+	h=h+runif(100)/100#
+	h=h%%1#
+	plot(xy$x,xy$y,col=hsv(h,s,v),pch=16,cex=6)#
+	Sys.sleep(0.1)#
+}
+dir("~/*.R")
+dir("~")
+dir("~/*.rdata")
+dir("~/.*.rdata")
+?dir
+dir("~/","tmlelassosim")
+files=dir("~/","tmlelassosim")
+load(files[[1]])
+files
+files=dir("~/","tmlelassosim",full.names=T)
+load(files[[1]])
+files[[1]]
+files
+files[[1]]
+files[1]
+files[2]
+files=files[-1]
+load(files[[1]])
+n
+ls()
+allresults=lapply(files,function(file){load(file); combinedresults})
+results=do.call(rbind,allresults)
+library(plyr)
+head(results)
+resultslong=melt(results,id=c("lambdaseq","iteration"),measure=c("psi","psi_tmle"),variable.name="est")
+library(reshape2)
+resultslong=melt(results,id=c("lambdaseq","iteration"),measure=c("psi","psi_tmle"),variable.name="est")
+head(resultslong)
+perf=ddply(resultslong,.(lambdsaseq),function(data){#
+	data.frame(bias2=(mean(data$value)-1)^2,#
+	mse=mean((data$value-1)^2),#
+	var=var(data$value))#
+}
+)
+perf=ddply(resultslong,.(lambdaseq),function(data){#
+	data.frame(bias2=(mean(data$value)-1)^2,#
+	mse=mean((data$value-1)^2),#
+	var=var(data$value))#
+})
+perflong=melt(perf,id="lambdaseq")
+perf=ddply(resultslong,.(lambdaseq,est),function(data){#
+	data.frame(bias2=(mean(data$value)-1)^2,#
+	mse=mean((data$value-1)^2),#
+	var=var(data$value))#
+})
+perflong=melt(perf,id=c("lambdaseq","est"))
+ggplot(perflong,aes(x=lambdaseq,y=value,color=variable))+geom_line()+facet_grid(~est)
+library(ggplot2)
+ggplot(perflong,aes(x=lambdaseq,y=value,color=variable))+geom_line()+facet_grid(~est)
+ggplot(resultslong,aes(x=lambdaseq,y=value))+geom_point()+facet_grid(~est)
+-2*mn_loglik(pred$pred,Y_ind,rep(1,length(Y)))
+levels(data[,Anode])
+pred=predict(sl,newdata=data[,Wnodes])
+DR
+rule_fits<-apply(DR,2,function(x){#
+        origami_SuperLearner(folds = folds, DR, data[, Wnodes], SL.library = SL.library$blip, family = gaussian())#
+    }
+test=predict(rule_fit,data[,Wnodes])$pred
+test=glmnet(Z[,1,],val_preds$Z,family="multinomial")
+ests <- obj$ests
+K <- split_preds[[K]][[v]][, A_index]
+g0 <- function(W) {#
+    W1 <- W[, 1]#
+    W2 <- W[, 2]#
+    W3 <- W[, 3]#
+    W4 <- W[, 4]#
+    # rep(0.5, nrow(W))#
+    A1 <- plogis(0.5*W1)#
+    A2 <- plogis(0.5*W2)#
+    A3 <- plogis(0.5*W3)#
+    A <- cbind(A1, A2, A3)#
+    # make sure A sums to 1#
+    A <- normalize_rows(A)#
+}
+data <- gen_data(1000, 5)#
+    result <- opt_tmle(data, SL.library = opt_tmle.SL.library)#
+    Wnodes <- result$nodes$Wnodes#
+    QaV_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "QaV")#
+    QaV_perf <- mean(Qbar0(QaV_dV, testdata[, Wnodes]))#
+    EYd_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")#
+    EYd_perf <- mean(Qbar0(EYd_dV, testdata[, Wnodes]))#
+    perf <- data.frame(blip_type, EYd_perf, QaV_perf)#
+    other_blips <- c("blip1", "blip2", "blip3")#
+    other_perf <- ldply(other_blips, function(blip_type) {#
+        other_fit <- with(result, learn_rule(data, folds, nodes, split_preds, val_preds, #
+            parallel = F, SL.library = SL.library, verbose, blip_type = blip_type))#
+        QaV_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "QaV")#
+        QaV_perf <- mean(Qbar0(QaV_dV, testdata[, Wnodes]))#
+        EYd_dV <- predict(other_fit, newdata = testdata[, Wnodes], pred_fit = "joint")#
+        EYd_perf <- mean(Qbar0(EYd_dV, testdata[, Wnodes]))#
+        data.frame(blip_type, EYd_perf, QaV_perf)#
+    })
+opt_tmle.SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.step.forward", #
+    "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), g = c("mnSL.randomForest", #
+    "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"), QaV = c("SL.glm", "SL.glmnetprob", #
+    "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), class = c("mnSL.randomForest", #
+    "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"))
+c(QaV_perf,class_perf,joint_perf,EYd0_perf)
+set.seed(1234)#
+result <- opt_tmle(data, SL.library = opt_tmle.SL.library, maximize = T)
+system.time({#
+    reduced_fits <- lapply(Vnodes, function(drop_Vnode) {#
+        newnodes$Vnodes <- setdiff(opt_obj$nodes$Vnodes, drop_Vnode)#
+        reduced_fit <- with(opt_obj, learn_rule(data, folds, newnodes, split_preds, #
+            val_preds, parallel = F, SL.library = SL.library, verbose = 3))#
+    })#
+    })
+system.time({#
+    # fit Q and g#
+    message_verbose("Fitting Q", 1, verbose)#
+    # todo: add support for continuous Y#
+    Q_fit <- origami_SuperLearner(folds = folds, data[, nodes$Ynode], data[, c(nodes$Anode, #
+        nodes$Wnodes)], family = binomial(), SL.library = SL.library$Q, cts.num = 5, #
+        .parallel = parallel, method = method.NNloglik(), control = list(trimLogit = 1e-05))#
+    Q_fit <- drop_zero_learners(Q_fit)#
+    })
+mv.method=method.mvSL(base_method)
+Q_fit3 <- SuperLearner(folds = folds, Y = data[, nodes$Ynode], X = data[, c(nodes$Anode, #
+        nodes$Wnodes)], family = binomial(), SL.library = SL.library$Q, cts.num = 5, #
+        .parallel = parallel, method = method.NNloglik(), control = list(trimLogit = 1e-05))
+Q_fit3 <- SuperLearner(Y = data[, nodes$Ynode], X = data[, c(nodes$Anode, #
+        nodes$Wnodes)], family = binomial(), SL.library = SL.library$Q,#
+        method = method.NNloglik(), control = list(trimLogit = 1e-05))
+Q_fit2 <- origami_SuperLearner(Y = data[, nodes$Ynode], X = data[, c(nodes$Anode, #
+        nodes$Wnodes)], family = binomial(), SL.library = SL.library$Q, cts.num = 5, #
+        .parallel = parallel, method = method.NNLS(), control = list(trimLogit = 1e-05))
+training=training()
+validation=validation()
+folds=make_folds(validation,V=splits)
+data <- gen_data(1000, 5)
+split_fits=make_split_folds(folds)
+rule_tmle(data$A, data$Y, val_preds$pA, val_preds$QaW, cv_dV2)
+V=1
+allnew=merge(newdata[,V,drop=F],newdata[,-V])
+setwd("/Users/jrcoyle/Dropbox/opttx/inst")
+load("/Users/jrcoyle/Dropbox/SUMs/campdates.rdata")
+load("/Users/jrcoyle/Dropbox/SUMs/campdates.rdata")
+campdates

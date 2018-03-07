@@ -20,8 +20,11 @@ opttx_split_preds <- function(fold, data, nodes, fits, use_full = F, ...) {
     A_vals <- vals_from_factor(data[, nodes$Anode])
     QaW <- pred_all_Q(splitQ_fit, data[, c(nodes$Anode, nodes$Wnodes)], A_vals, nodes$Anode)
     newdata <- data[, c(nodes$Anode, nodes$Wnodes)]
-    pA <- predict(splitg_fit, data[, nodes$Wnodes])$pred
+    pA <- predict(splitg_fit, data[, nodes$Wnodes, drop = F])$pred
     pA[pA < 0.05] <- 0.05
+    if (ncol(pA) == 1) {
+        pA <- cbind(1 - pA, pA)
+    }
     # split specific blip, class, and weights
     A <- data[, nodes$Anode]
     Y <- data[, nodes$Ynode]
@@ -79,8 +82,8 @@ extract_vals <- function(folds, split_preds, parallel = F) {
     
 }
 # todo: reintroduce binary versions of these based on blips
-QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, 
-    full_preds, blip_type = "DR", use_full = F, ...) {
+QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, full_preds, blip_type = "DR", 
+    use_full = F, ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()
@@ -106,8 +109,8 @@ QaV_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_pred
     cv_SL(fold, to_predict, X, SL.library, family, obsWeights, id, ...)
 }
 #' @export
-class_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, 
-    full_preds, use_full = F, ...) {
+class_cv_SL <- function(fold, Y, X, SL.library, family, obsWeights, id, split_preds, full_preds, use_full = F, 
+    ...) {
     v <- fold_index()
     train_idx <- training()
     valid_idx <- validation()

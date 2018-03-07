@@ -16,4 +16,4 @@ Depends:
     nloptr,
     hitandrun,
     reshape2
-    
+RoxygenNote: 6.0.1

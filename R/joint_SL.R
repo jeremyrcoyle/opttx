@@ -34,8 +34,8 @@ create_predmat <- function(QaV_fit, class_fit, newdata = "cv-original") {
 # combine QaV and class_fits
 joint_sl <- function(QaV_fit, class_fit, predictions, data, nodes, risk_generator = create_tmle_risk) {
     
-    # evaluate combined coefficient, plus a small number of random starting points to
-    # find a good neighborhood
+    # evaluate combined coefficient, plus a small number of random starting points to find a good
+    # neighborhood
     jsl_obj <- create_predmat(QaV_fit, class_fit, "cv-original")
     num_alg <- length(jsl_obj$init_coef)
     risk_fun <- risk_generator(jsl_obj$Z, data, nodes, predictions)

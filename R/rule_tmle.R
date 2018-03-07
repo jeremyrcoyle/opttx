@@ -1,7 +1,7 @@
 ################################################################ TMLE for dynamic regimes
 
-# TMLE for a rule works by redefining A=1 as 'followed rule' and A=0 as 'didn't
-# follow rule' pA is updated accordingly todo: move to gentmle
+# TMLE for a rule works by redefining A=1 as 'followed rule' and A=0 as 'didn't follow rule' pA is
+# updated accordingly todo: move to gentmle
 fit_rule_tmle <- function(obsA, obsY, pA, QaW, dV) {
     # dV <- factor(levels(obsA)[dV], levels(obsA))
     Ad <- as.numeric(obsA == dV)
@@ -38,9 +38,8 @@ EY <- function(obsA, obsY, pA, QaW, dV) {
     data.frame(est = est, se = se, lower = lower, upper = upper)
 }
 
-# difference of two TMLEs using the delta method note that this may not work
-# because sometimes the rules are nested which means in the limit one rule minus
-# the other rule always has the same sign
+# difference of two TMLEs using the delta method note that this may not work because sometimes the
+# rules are nested which means in the limit one rule minus the other rule always has the same sign
 two_rule_tmle <- function(obsA, obsY, pA, QaW, dV, dV2) {
     results <- fit_rule_tmle(obsA, obsY, pA, QaW, dV)
     results2 <- fit_rule_tmle(obsA, obsY, pA, QaW, dV2)
@@ -53,8 +52,7 @@ two_rule_tmle <- function(obsA, obsY, pA, QaW, dV, dV2) {
 }
 
 
-estimate_performance <- function(data, nodes, predictions, dV, perf_tmle = TRUE, 
-    perf_dripcw = FALSE) {
+estimate_performance <- function(data, nodes, predictions, dV, perf_tmle = TRUE, perf_dripcw = FALSE) {
     A <- data[, nodes$Anode]
     Y <- data[, nodes$Ynode]
     A_vals <- vals_from_factor(A)
