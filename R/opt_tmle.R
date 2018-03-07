@@ -1,3 +1,9 @@
+#' @title Example library specification
+#' @description Separate libraries must be specified for Q, g, QaV, and the classifier
+opt_tmle.SL.library <- list(Q = c("SL.glm", "SL.glmem", "SL.glmnetprob", "SL.step.forward", "SL.gam", 
+    "SL.rpart", "SL.rpartPrune", "SL.mean"), g = c("mnSL.randomForest", "mnSL.glmnet", "mnSL.multinom", 
+    "mnSL.mean"), QaV = c("SL.glm", "SL.glmnetprob", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", 
+    "SL.mean"), class = c("mnSL.randomForest", "mnSL.glmnet", "mnSL.multinom", "mnSL.mean"))
 
 #' @title opt_tmle
 #' @description Estimation of the Optimal Treatment rule using Super Learner and mean performance using CV-TMLE
@@ -9,107 +15,141 @@
 #' @param Ynode, column name of outcome
 #' @param Vnodes, vector of column names to base the treatment on
 #' @param stratifyAY, logical: should we stratify the cross-validation based on (A,Y) pairs
-#' @param Q_library, vector of SuperLearner learners for the fit of E(Y|A,W)
-#' @param g_library, vector of SuperLearner learners for the fit of P(A|W)
-#' @param blip_library, vector of SuperLearner learners for the fit of E(Y_1-Y_0|V)
-#' @param blip_type, character indicating type of blip, default is 'Qbv.mse'
-#' @param maximize, logical: should we try to maximize the outcome (because it's a positive outcome)
+#' @param SL_library, list of SuperLearner libraries for the various models. See \code{\link{opt_tmle.SL_library}} for an example.
 #' @param verbose, integer that controls the verbosity of the output (higher is more verbose)
 #' @param parallel, logical: should foreach parallelization be used?
-#' @seealso \code{\link{assign_treatment}}
 #' @example /inst/examples/opttx.R
 #' 
 #' @export
-opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = T), Anode = "A", Ynode = "Y", Vnodes = Wnodes, stratifyAY = TRUE, 
-    Q_library = c("SL.glm", "SL.glmem", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), 
-    g_library = c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), blip_library = c("SL.glm", 
-        "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean"), blip_type = c("QbV.mse", "cl.surlog"), 
-    maximize = T, verbose = 1, parallel = F) {
+opt_tmle <- function(data, Wnodes = grep("^W", names(data), value = TRUE), Anode = "A", Ynode = "Y", 
+    Vnodes = Wnodes, stratifyAY = TRUE, SL.library = opt_tmle.SL.library, verbose = 3, parallel = FALSE, 
+    perf_tmle = TRUE, perf_dripcw = FALSE, perf_cv = TRUE, perf_full = FALSE, maximize = TRUE, ...) {
     
-    blip_type <- match.arg(blip_type)
+    # ensure A is a factor
+    data[, Anode] <- as.factor(data[, Anode])
+    
     if (stratifyAY) {
         AYstrata <- sprintf("%s %s", data[, Anode], data[, Ynode])
         folds <- make_folds(strata_ids = AYstrata, V = 10)
     } else {
-        folds <- make_folds(V = 10)
+        folds <- make_folds(data, V = 10)
     }
     
-    # possibly we should make these lists the arguments directly (ltmle does this for SL.library, but not for nodes)
-    nodes <- list(Wnodes = Wnodes, Anode = Anode, Ynode = Ynode, Vnodes = Vnodes)
-    SL.library <- list(Q_library = Q_library, g_library = g_library, blip_library = blip_library)
+    # Y=data[,nodes$Ynode] X=data[,c(nodes$Anode,nodes$Wnodes)] osl_args<- list(family = binomial(),
+    # SL.library = SL.library$Q, cts.num = 10, .parallel = parallel, method = method.NNloglik(),
+    # control = list(trimLogit = 1e-05))
+    
+    # split=split_SL(folds,Y,X,osl_args) full=split_SL(folds,Y,X,osl_args,approach='full')
+    # nested=split_SL(folds,Y,X,osl_args,approach='full')
+    
+    data$Ystar <- data[, Ynode]
+    if (!maximize) {
+        minY <- min(data$Ystar)
+        maxY <- max(data$Ystar)
+        data$Ystar <- (minY + maxY) - data$Ystar
+    }
+    
+    # possibly we should make these lists the arguments directly (ltmle does this for SL.library, but
+    # not for nodes)
+    nodes <- list(Wnodes = Wnodes, Anode = Anode, Ynode = "Ystar", Vnodes = Vnodes)
     
     # fit Q and g
     message_verbose("Fitting Q", 1, verbose)
-    Q_fit <- origami_SuperLearner(folds = folds, data[, Ynode], data[, c(Anode, Wnodes)], family = binomial(), SL.library = SL.library$Q_library, 
-        cts.num = 5, .parallel = parallel)
+    # todo: add support for continuous Y
+    Q_fit_args <- list(folds = folds, Y = data[, nodes$Ynode], X = data[, c(nodes$Anode, nodes$Wnodes)], 
+        family = binomial(), SL.library = SL.library$Q, cts.num = 10, .parallel = parallel, method = method.NNloglik(), 
+        control = list(trimLogit = 1e-05))
+    Q_fit <- split_from_args(Q_fit_args)
+    
+    # Q_fit_full <- split_to_full(Q_fit) Q_fit_nested <- split_to_nested(Q_fit,Q_fit_args) Q_fit <-
+    # drop_zero_learners(Q_fit)
     
     message_verbose("Fitting g", 1, verbose)
-    g_fit <- origami_SuperLearner(folds = folds, data[, Anode], data[, Wnodes], family = binomial(), SL.library = SL.library$g_library, 
-        cts.num = 5, .parallel = parallel)
+    g_fit_args <- list(folds = folds, Y = data[, nodes$Anode], X = data[, nodes$Wnodes], SL.library = SL.library$g, 
+        family = list(family = "multinomial"), method = method.mnNNloglik())
+    g_fit <- split_from_args(g_fit_args)
+    # g_fit <- drop_zero_learners(g_fit)
     fits <- list(Q_fit = Q_fit, g_fit = g_fit)
     
     # get split-specific predictions, as well as class and weight for rule learning
     message_verbose("Getting split-specific predictions", 2, verbose)
-    split_preds <- cross_validate(cv_split_preds, folds, data, nodes, fits, maximize = maximize, .combine = F, .parallel = parallel)
+    split_preds <- cross_validate(opttx_split_preds, folds, data, nodes, fits, .combine = F, .parallel = parallel)
     
-    # fit rule
+    full_preds <- opttx_split_preds(folds[[1]], data, nodes, fits, use_full = T)
+    val_preds <- extract_vals(folds, split_preds)
+    EYdmethod <- method.EYd(val_preds)
+    mvSLmethod <- method.mvSL(method.NNLS())
+    # debug(mvSLmethod$computeCoef) fit rule
     message_verbose("Fitting rule", 1, verbose)
-    fits$blip_fit <- learn_rule(data, folds, nodes, split_preds, SL.library$blip_library, blip_type, maximize = maximize, 
-        parallel)
+    # full_preds$DR=(plogis(trimLogit(full_preds$DR)))
+    rule_args <- list(folds = folds, Y = data[, nodes$Ynode], X = data[, nodes$Vnodes, drop = F], cts.num = 10, 
+        split_preds = split_preds, full_preds = full_preds, SL.library = SL.library$QaV, family = gaussian(), 
+        cvfun = QaV_cv_SL, .parallel = parallel, blip_type = "blip2", use_full = F, method = mvSLmethod)  # EYdmethod)   # mvSLmethod)  # 
+    
+    fits$rule_fit <- split_from_args(rule_args)
     
     # estimate performance
     message_verbose("Estimating performance", 1, verbose)
-    ests <- all_ests(data, folds, nodes, fits, split_preds, blip_type, parallel)
+    A_vals <- vals_from_factor(data[, nodes$Anode])
+    cv_dV <- dV_from_preds(predict(fits$rule_fit, newdata = "cv-original")$pred, A_vals)
+    dV <- dV_from_preds(predict(fits$rule_fit, newdata = data[, nodes$Vnodes])$pred, A_vals)
     
-    result <- list(data = data, fits = fits, ests = ests, nodes = nodes, SL.library = SL.library, folds = folds, split_preds = split_preds, 
-        blip_type = blip_type, maximize = maximize)
-    result$optA <- assign_treatment(result, data)
+    
+    cv_ests <- NULL
+    nodes$Ynode <- Ynode
+    if (perf_cv) {
+        cv_ests <- estimate_performance(data, nodes, val_preds, cv_dV, perf_tmle, perf_dripcw)
+        cv_ests$estimator <- sprintf("CV-%s", cv_ests$estimator)
+    }
+    
+    full_ests <- NULL
+    if (perf_full) {
+        full_ests <- estimate_performance(data, nodes, full_preds, dV, perf_tmle, perf_dripcw)
+    }
+    
+    ests <- rbind(cv_ests, full_ests)
+    result <- list(data = data, fits = fits, ests = ests, nodes = nodes, SL.library = SL.library, folds = folds, 
+        split_preds = split_preds, val_preds = val_preds, full_preds = full_preds, rule_args = rule_args, 
+        dV = dV, cv_dV = cv_dV)
+    
     class(result) <- "opt_tmle"
-    
+    plot(result)
     return(result)
 }
-treatment_from_pred <- function(pred, blip_type) {
-    if (blip_type == "QbV.mse") {
-        as.numeric(pred > 0)
-    } else {
-        as.numeric(pred > 0.5)
-    }
-}
-#' @title assign_treatment
-#' @description Given a opt_tmle object, assign treatment to a new dataset
-#' @param obj, an object generated by opt_tmle
-#' @param newdata, a data.frame containing columns corresponding to the Vnodes
-#' @seealso \code{\link{opt_tmle}}
-#' 
-#' @export
-assign_treatment <- function(obj, newdata) {
-    pblip <- predict(obj$fits$blip_fit, newdata = newdata[, obj$nodes$Vnodes, drop = F])$pred
-    treatment_from_pred(pblip, obj$blip_type)
-}
-
 
 #' @rdname opt_tmle
 #' @export
 print.opt_tmle <- function(obj) {
     A <- obj$data[, obj$nodes$Anode]
-    optA <- obj$optA
+    dV <- obj$dV
     n <- length(A)
-    tab <- table(`observed tx` = A, `optimal tx` = optA)/n
+    tab <- table(`observed tx` = A, `optimal tx` = dV)/n
     tab <- addmargins(tab)
     cat("Treatment Assignments\n\n")
     
-    print(tab)
+    print(tab, width = 200)
     cat("\n\n")
     ests <- obj$ests
-    names(ests) <- c("Estimate", "SD", "CI Lower Bound", "CI Upper Bound")
-    cat("CV-TMLE Estimates\n\n")
-    print(ests)
+    ests <- ests[order(ests$estimator, ests$rule), ]
+    names(ests) <- c("Estimate", "SE", "CI Lower Bound", "CI Upper Bound", "Intervention", "Estimator")
+    cat("EYa Estimates\n\n")
+    print(ests, width = 200)
 }
 
 
 #' @rdname opt_tmle
 #' @export
 plot.opt_tmle <- function(obj) {
-    ggplot(obj$ests, aes(y = rule, x = est, xmin = lower, xmax = upper)) + geom_point() + geom_errorbarh() + theme_bw() + 
-        ylab("Rule") + xlab(expression(E ~ bgroup("[", Y[A], "]")))
+    ggplot(obj$ests, aes(y = rule, x = est, xmin = lower, xmax = upper)) + geom_point() + geom_errorbarh() + 
+        theme_bw() + ylab("Rule") + xlab(expression(E ~ bgroup("[", Y[A], "]"))) + facet_wrap(~estimator)
+}
+
+#' @rdname opt_tmle
+#' @export
+predict.opt_tmle <- function(obj, ...) {
+    pred_QaV <- predict(obj$fits$rule_fit, ...)$pred
+    
+    dV <- dV_from_preds(pred_QaV)
+    
+    list(pred_QaV = pred_QaV, dV = dV)
 } 

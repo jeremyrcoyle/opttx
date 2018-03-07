@@ -1,3 +1,4 @@
+setwd("~/Dropbox/opttx/")
 library(devtools)
 library(formatR)
 rebuild <- function() {

@@ -1,11 +1,14 @@
-Wnodes <- grep("^W", names(data), value = T)
+# Wnodes <- grep('^W', names(data), value = TRUE)
 Anode <- "A"
 Ynode <- "Y"
 Vnodes <- Wnodes
 stratifyAY <- TRUE
-Q_library <- c("SL.glm", "SL.glmem", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean")
-g_library <- c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean")
-blip_library <- c("SL.glm", "SL.glmnet", "SL.step.forward", "SL.gam", "SL.rpart", "SL.rpartPrune", "SL.mean")
-maximize <- T
-verbose <- 2
-parallel <- F 
+
+
+verbose <- 4
+parallel <- FALSE
+perf_tmle <- TRUE
+perf_dripcw <- FALSE
+perf_cv <- TRUE
+perf_full <- TRUE
+maximize <- TRUE 
